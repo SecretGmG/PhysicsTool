@@ -10,8 +10,7 @@ from sys import set_coroutine_origin_tracking_depth
 from copy import deepcopy, copy
 from sys import stdout
 
-from .aggregators import avg_err, err_from_data, weighted_avg_err
-from .solvers import solve_eq, calc, calc_err, derive_err
+from .solvers import solve_eq, calc, calc_err, err_from_data, avg_err, derive_err
 from .fmt import fmt_err_to_tex
 from .logging import log
 from .plotting import start_plt, end_plt, err_band_plot
