@@ -30,14 +30,20 @@ class Err:
             x = list(free_symbols)[0]
         return Err(sympy.lambdify(x, foo)(self.mean), sympy.lambdify(x, sympy.Abs(sympy.diff(foo, x)))(self.mean)*self.err)
 
-    def approxEq(self, other) -> bool:
+    def approx_eq(self, other: ArrayLike | Self) -> bool:
         """
         returns True if both values lie within each others error bounds
         """
         if isinstance(other, Err):
-            return np.allclose(self.mean, other.mean, atol=np.minimum(self.err, other.err))
+            return np.allclose(self.mean, other.mean, atol=np.sqrt(self.err**2+other.err**2))
         else:
             return np.allclose(self.mean, other, atol=self.err)
+
+    def allclose(self, other : Self) -> bool:
+        """
+        returns True of both values mean and error are close to each other
+        """
+        return np.allclose(self.mean, other.mean) and np.allclose(self.err, other.err)
 
     def average(self, axis=None) -> Self:
         """
