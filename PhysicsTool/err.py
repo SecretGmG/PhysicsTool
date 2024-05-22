@@ -80,7 +80,7 @@ class Err:
         return '$' + self._latex_cores(sigfigs, min_precision, max_precision, relative) + '$'
 
     def _repr_latex_(self):
-        return '$'+r'\\'.join(np.ravel([self._latex_cores()])) +'$'
+        return '$$'+r'\\'.join(np.ravel([self._latex_cores()])) +'$$'
 
     def formatted(self,
                    sigfigs: int = 2,
