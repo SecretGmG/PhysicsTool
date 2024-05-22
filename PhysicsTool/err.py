@@ -58,7 +58,17 @@ class Err:
         """
         return Err(np.sum(self.mean*self.err**-2, axis=axis)/np.sum(self.err**-2), np.sum(self.err**-2, axis=axis)**-0.5)
 
-    def latex(self,
+    def _latex_cores(self,
+              sigfigs: int = 2,
+              min_precision: int = 0,
+              max_precision: int = 16,
+              relative: bool = False
+        ):
+        mean_str, err_str = self.formatted(
+            sigfigs, min_precision, max_precision, relative)
+        return mean_str + np.choose(err_str == '0', ['\pm' + err_str + (r'\%' if relative else ''), ''])
+
+    def latex_array(self,
               sigfigs: int = 2,
               min_precision: int = 0,
               max_precision: int = 16,
@@ -67,16 +77,10 @@ class Err:
         """
         Returns a numpy string array with a latex expression for every element
         """
-        mean_str, err_str = self.formatted(
-            sigfigs, min_precision, max_precision, relative)
-        if relative:
-            err_str += '\\%'
-        return '$' + mean_str + '\pm' + err_str + '$'
+        return '$' + self._latex_cores(sigfigs, min_precision, max_precision, relative) + '$'
 
     def _repr_latex_(self):
-        return '$'+r'\\'.join(l[1:-1] for l in np.ravel(np.array([self.latex()])))+'$'
-        mean_str, err_str = self.formatted()
-        return '$' + r'\\'.join(rf'{m} \pm {e}' for m, e in zip(np.ravel(mean_str), np.ravel(err_str))) + '$'
+        return '$'+r'\\'.join(np.ravel([self._latex_cores()])) +'$'
 
     def formatted(self,
                    sigfigs: int = 2,
@@ -92,8 +96,8 @@ class Err:
         import warnings
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', RuntimeWarning)
-            zeroformatted = _fmt_to_order(self.mean, _get_order(
-                self.mean) - sigfigs, min_precision, max_precision)
+            zeroformatted = _fmt_to_order(self.mean, np.minimum(_get_order(
+                self.mean),0) - sigfigs, min_precision, max_precision)
             normalformatted = _fmt_to_order(self.mean, _get_order(
                 self.err) - sigfigs, min_precision, max_precision)
             normalformatted_err = _fmt_to_order(temp_err, _get_order(
