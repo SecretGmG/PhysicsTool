@@ -151,6 +151,25 @@ class Err:
     def __truediv__(self, other):
         a, b = sympy.symbols('a,b')
         return calc_err(a/b, {a: self, b: other})
+    def __radd__(self, other):
+        a, b = sympy.symbols('a,b')
+        return calc_err(b+a, {a: self, b: other})
+
+    def __rsub__(self, other):
+        a, b = sympy.symbols('a,b')
+        return calc_err(b-a, {a: self, b: other})
+
+    def __rmul__(self, other):
+        a, b = sympy.symbols('a,b')
+        return calc_err(b*a, {a: self, b: other})
+
+    def __rpow__(self, other):
+        a, b = sympy.symbols('a,b')
+        return calc_err(b**a, {a: self, b: other})
+
+    def __rtruediv__(self, other):
+        a, b = sympy.symbols('a,b')
+        return calc_err(b/a, {a: self, b: other})
 
     def __repr__(self):
         mean_str, err_str = self.formatted()
