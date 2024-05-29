@@ -263,18 +263,19 @@ def calc_err(expr: sympy.Expr,
     err_mean_values = {}
     err_err_values = {}
     const_values = {}
+    
     for key, val in values.items():
         if isinstance(val, Err):
-            err_mean_values[key] = values[key].mean
-            err_err_values[Symbol(f'{err_prefix}_{key}')] = values[key].err
+            err_mean_values[key] = val.mean
+            err_err_values[Symbol(f'{err_prefix}_{key}')] = val.err
         else:
-            const_values[key] = np.array(values[key])
+            const_values[key] = np.array(val)
 
-    values = err_mean_values | err_err_values | const_values
+    array_values = err_mean_values | err_err_values | const_values
 
     err_expr = derive_err(expr, err_mean_values.keys(), err_prefix=err_prefix)
 
-    mean_func = sympy.lambdify(values.keys(), expr)
-    err_func = sympy.lambdify(values.keys(), err_expr)
+    mean_func = sympy.lambdify(array_values.keys(), expr)
+    err_func = sympy.lambdify(array_values.keys(), err_expr)
 
-    return Err(mean_func(*values.values()), err_func(*values.values()))
+    return Err(mean_func(*array_values.values()), err_func(*array_values.values()))
