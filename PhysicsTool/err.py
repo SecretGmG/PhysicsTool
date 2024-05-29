@@ -1,6 +1,5 @@
 import numpy as np
 import sympy
-from .logging import log
 from numpy.typing import ArrayLike
 from sympy import Symbol, Expr, Function, Eq
 from typing import Optional, Dict, List, TextIO, Self
@@ -214,7 +213,7 @@ def derive_err(
     Returns:
         Expr: The expression for the absolute Gaussian error
     """
-
+    from .logging import log
     target_err_symbol = Symbol(f'{err_prefix}_{target_symbol}')
     target_err_symbol_squared = target_err_symbol ** 2
 

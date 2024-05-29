@@ -24,6 +24,8 @@ def log(expr: str | sympy.Basic | pd.DataFrame | Latex, do_display: bool = True,
         verbose (bool, optional): Whether to display the expression. Defaults to True.
         tex (Optional[TextIO]): A TextIO object to write LaTeX representation. Defaults to sys.stdout.
     """
+    from .err import Err
+    
     if do_display:
         display(expr)
 
@@ -33,12 +35,12 @@ def log(expr: str | sympy.Basic | pd.DataFrame | Latex, do_display: bool = True,
         latex_str = _get_tex_sympy(expr, do_display, tex)
     elif (isinstance(expr, pd.DataFrame)):
         latex_str = _get_tex_df(expr, do_display, tex)
-    elif (isinstance(expr, Latex)):
-        latex_str = expr._repr_latex_()
-        if type(latex_str) is tuple:
-            latex_str, *_ = latex_str
     else:
-        latex_str = str(expr)
-
+        try:
+            latex_str = expr._repr_latex_()
+            if type(latex_str) is tuple:
+                latex_str, *_ = latex_str
+        except Exception:
+            latex_str = str(expr)
     if tex:
         tex.write(latex_str + '\n')
