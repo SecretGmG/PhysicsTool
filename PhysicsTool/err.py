@@ -5,8 +5,16 @@ from sympy import Symbol, Expr, Function, Eq
 from typing import Optional, Dict, List, TextIO, Self
 
 class Err:
-    def __init__(self, mean: ArrayLike, err : ArrayLike):
+    def __init__(self, mean: ArrayLike, err : ArrayLike = None):
+        if err is None:
+            if isinstance(np.array(mean).ravel()[0],Err):
+                err = np.vectorize(lambda e: e.err)(mean)
+                mean = np.vectorize(lambda e: e.mean)(mean)
+            else:
+                err = np.zeros_like(mean)
+        
         mean, err = np.broadcast_arrays(mean, err)
+        
         self.mean = np.array(mean)
         self.err = np.array(err)
 
@@ -260,22 +268,21 @@ def calc_err(expr: sympy.Expr,
     """
     err_prefix = 'temporary_error_prefix'
 
-    err_mean_values = {}
-    err_err_values = {}
-    const_values = {}
+    mean_values = {}
+    err_values = {}
     
     for key, val in values.items():
-        if isinstance(val, Err):
-            err_mean_values[key] = val.mean
-            err_err_values[Symbol(f'{err_prefix}_{key}')] = val.err
-        else:
-            const_values[key] = np.array(val)
+        if not isinstance(val, Err):
+            values[key] = Err(val)
+            
+    for key, val in values.items():
+        mean_values[key] = val.mean
+        err_values[Symbol(f'{err_prefix}_{key}')] = val.err
 
-    array_values = err_mean_values | err_err_values | const_values
+    all_values = mean_values | err_values
+    err_expr = derive_err(expr, mean_values.keys(), err_prefix=err_prefix)
 
-    err_expr = derive_err(expr, err_mean_values.keys(), err_prefix=err_prefix)
+    mean_func = sympy.lambdify(all_values.keys(), expr)
+    err_func = sympy.lambdify(all_values.keys(), err_expr)
 
-    mean_func = sympy.lambdify(array_values.keys(), expr)
-    err_func = sympy.lambdify(array_values.keys(), err_expr)
-
-    return Err(mean_func(*array_values.values()), err_func(*array_values.values()))
+    return Err(mean_func(*all_values.values()), err_func(*all_values.values()))
