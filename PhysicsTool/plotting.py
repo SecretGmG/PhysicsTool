@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+from numpy.typing import ArrayLike
+from typing import Optional
 
 def start_plt(title: str, xlabel: str, ylabel: str, grid: bool = True) -> None:
     """
@@ -34,7 +36,7 @@ def end_plt(show: bool = True, legend_loc: str = 'best') -> None:
     if show:
         plt.show()
 
-def err_band_plot(x, y, y_err, label = None, color = None):
+def err_band_plot(x: ArrayLike, y: ArrayLike, y_err: ArrayLike, label: Optional[str] = None, color: Optional[str] = None) -> None:
     """
     Plots the function defined by x, y, and additionally the a shaded error band according to y_err
 

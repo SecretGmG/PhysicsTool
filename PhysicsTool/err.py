@@ -5,9 +5,24 @@ from sympy import Symbol, Expr, Function, Eq
 from typing import Optional, Dict, List, TextIO, Self
 
 class Err:
+    """
+    A class to handle measurements and their associated errors.
+    
+    Attributes:
+        mean (np.ndarray): The mean values of the measurements.
+        err (np.ndarray): The errors associated with the measurements.
+    """
     def __init__(self, mean: ArrayLike, err : ArrayLike = None):
+        """
+        Initializes an instance of the Err class.
+        
+        Parameters:
+            mean (ArrayLike): The mean values of the measurements.
+            err (Optional[ArrayLike]): The errors associated with the measurements. If None, initializes with zero errors.
+        """
+        mean = np.asarray(mean)
         if err is None:
-            if isinstance(np.array(mean).ravel()[0],Err):
+            if isinstance(mean.ravel()[0],Err):
                 err = np.vectorize(lambda e: e.err)(mean)
                 mean = np.vectorize(lambda e: e.mean)(mean)
             else:
@@ -18,28 +33,53 @@ class Err:
         self.mean = np.array(mean)
         self.err = np.array(err)
 
-    def from_data(data: ArrayLike, axis=None) -> Self:
-        return Err(np.mean(data, axis), np.std(data, axis, ddof=1) /
-                   np.sqrt(np.size(data, axis)))
+    @classmethod
+    def from_data(cls, data: ArrayLike, axis: Optional[int] = None) -> Self:
+        """
+        Creates an Err instance from data by calculating the mean and standard error of the mean.
+        
+        Parameters:
+            data (ArrayLike): The input data.
+            axis (Optional[int]): The axis along which to calculate the mean and standard error.
+        
+        Returns:
+            Err: The created Err instance.
+        """
+        mean = np.mean(data, axis)
+        std_err = np.std(data, axis, ddof=1) / np.sqrt(np.size(data, axis))
+        return cls(mean, std_err)
 
     def apply(self, foo: Function | Expr) -> Self:
         """
-        Applies the given function or expression to Self. 
-        If given an expression it can only have a single free symbol.
+        Applies the given function or expression to self.
+        
+        Parameters:
+            foo (Function | Expr): The function or expression to apply.
+        
+        Returns:
+            Err: The resulting Err instance.
         """
         x = Symbol('x')
         if isinstance(foo, sympy.FunctionClass):
             foo = foo(x)
         else:
             free_symbols = foo.free_symbols
-            assert len(free_symbols) == 1, \
-                'cannot apply function with more than one argument. Use calc_err to compute such expressions'
+            assert len(free_symbols) == 1, 'Cannot apply function with more than one argument. Use calc_err to compute such expressions.'
             x = list(free_symbols)[0]
-        return Err(sympy.lambdify(x, foo)(self.mean), sympy.lambdify(x, sympy.Abs(sympy.diff(foo, x)))(self.mean)*self.err)
-
+        
+        mean_result = sympy.lambdify(x, foo)(self.mean)
+        err_result = sympy.lambdify(x, sympy.Abs(sympy.diff(foo, x)))(self.mean) * self.err
+        return Err(mean_result, err_result)
+    
     def approx_eq(self, other: ArrayLike | Self) -> bool:
         """
-        returns True if both values lie within each others error bounds
+        Returns True if both values lie within each other's error bounds.
+        
+        Parameters:
+            other (ArrayLike | Err): The other value to compare with.
+        
+        Returns:
+            bool: True if the values are approximately equal, False otherwise.
         """
         if isinstance(other, Err):
             return np.allclose(self.mean, other.mean, atol=np.sqrt(self.err**2+other.err**2))
@@ -48,22 +88,46 @@ class Err:
 
     def allclose(self, other : Self) -> bool:
         """
-        returns True of both values mean and error are close to each other
+        Returns True if both values' means and errors are close to each other.
+        
+        Parameters:
+            other (Err): The other Err instance to compare with.
+        
+        Returns:
+            bool: True if the values are all close, False otherwise.
         """
         return np.allclose(self.mean, other.mean) and np.allclose(self.err, other.err)
 
     def average(self, axis=None) -> Self:
         """
-        computes the average and its propagated error along a given axis
+        Computes the average and its propagated error along a given axis.
+        
+        Parameters:
+            axis (Optional[int]): The axis along which to compute the average.
+        
+        Returns:
+            Err: The resulting Err instance.
         """
-        return Err(self.mean.mean(axis = axis), np.sqrt(np.sum(self.err**2, axis=axis)) / np.size(self.err, axis=axis))
+        mean_avg = self.mean.mean(axis=axis)
+        err_avg = np.sqrt(np.sum(self.err ** 2, axis=axis)) / np.size(self.err, axis=axis)
+        return Err(mean_avg, err_avg)
 
     def weighted_average(self, axis=None) -> Self:
         """
-        Calculate the weighted average and combined error along a given axis as explained here:
+        Calculate the weighted average and combined error along a given axis.
+        this method is explained here:
         https://www.physics.umd.edu/courses/Phys261/F06/ErrorPropagation.pdf
+        
+        Parameters:
+            axis (Optional[int]): The axis along which to compute the weighted average.
+        
+        Returns:
+            Err: The resulting Err instance.
         """
-        return Err(np.sum(self.mean*self.err**-2, axis=axis)/np.sum(self.err**-2), np.sum(self.err**-2, axis=axis)**-0.5)
+        weights = 1 / (self.err ** 2)
+        mean_weighted_avg = np.sum(self.mean * weights, axis=axis) / np.sum(weights, axis=axis)
+        err_weighted_avg = np.sqrt(1 / np.sum(weights, axis=axis))
+        return Err(mean_weighted_avg, err_weighted_avg)
 
     def _latex_cores(self,
               sigfigs: int = 2,
@@ -82,7 +146,16 @@ class Err:
               relative: bool = False
               ) -> ArrayLike:
         """
-        Returns a numpy string array with a latex expression for every element
+        Returns a numpy string array with a LaTeX expression for every element.
+        
+        Parameters:
+            sigfigs (int): Significant figures.
+            min_precision (int): Minimum precision.
+            max_precision (int): Maximum precision.
+            relative (bool): Whether to format errors as relative percentages.
+        
+        Returns:
+            ArrayLike: LaTeX formatted array.
         """
         return '$' + self._latex_cores(sigfigs, min_precision, max_precision, relative) + '$'
 
@@ -95,7 +168,18 @@ class Err:
                    max_precision: int = 16,
                    relative: bool = False,
                    ) -> ArrayLike:
-
+        """
+        Formats the mean and error values.
+        
+        Parameters:
+            sigfigs (int): Significant figures.
+            min_precision (int): Minimum precision.
+            max_precision (int): Maximum precision.
+            relative (bool): Whether to format errors as relative percentages.
+        
+        Returns:
+            tuple: Formatted mean and error strings.
+        """
         temp_err = self.err.copy()
         if relative:
             temp_err *= 100/self.mean
@@ -126,6 +210,18 @@ class Err:
                    max_precision: int = 16,
                    relative: bool = False,
                    ) -> ArrayLike:
+        """
+        Formats the mean values.
+        
+        Parameters:
+            sigfigs (int): Significant figures.
+            min_precision (int): Minimum precision.
+            max_precision (int): Maximum precision.
+            relative (bool): Whether to format errors as relative percentages.
+        
+        Returns:
+            ArrayLike: Formatted mean strings.
+        """
         return self.formatted(sigfigs, min_precision, max_precision, relative)[0]
     
     def formatted_err(self,
@@ -134,6 +230,18 @@ class Err:
                    max_precision: int = 16,
                    relative: bool = False,
                    ) -> ArrayLike:
+        """
+        Formats the error values.
+        
+        Parameters:
+            sigfigs (int): Significant figures.
+            min_precision (int): Minimum precision.
+            max_precision (int): Maximum precision.
+            relative (bool): Whether to format errors as relative percentages.
+        
+        Returns:
+            ArrayLike: Formatted error strings.
+        """
         return self.formatted(sigfigs, min_precision, max_precision, relative)[1]
     
     def __getitem__(self, indices):
@@ -185,12 +293,24 @@ class Err:
 @np.vectorize(otypes = [int])
 def _get_order(num: float) -> int:
     if num == 0:
-        return -1024
+        return -40 # corresponds to float min value of ~ 1e-39
     return int(np.floor(np.log10(abs(num)))) + 1
 
 
 @np.vectorize(otypes = ['O'])
 def _fmt_to_order(num: float, order: int, min_precision: int, max_precision: int) -> str:
+    """
+    Formats the number to the specified order of magnitude with given precision constraints.
+    
+    Parameters:
+        num (float): The input number.
+        order (int): The order of magnitude to format to.
+        min_precision (int): The minimum precision of the formatted number.
+        max_precision (int): The maximum precision of the formatted number.
+        
+    Returns:
+        str: The formatted number as a string.
+    """
     precision = np.clip(-order, min_precision, max_precision)
     return f"{round(num,-order):.{precision}f}"
 
@@ -263,8 +383,13 @@ def calc_err(expr: sympy.Expr,
              ) -> Err:
     """
     Calculates the error of the given expression applied to the given values.
+    
+    Parameters:
+        expr (Expr): The sympy expression for which to calculate the error.
+        values (Dict[Symbol, Union[Err, ArrayLike]]): A dictionary mapping symbols to Err instances or array-like values.
+        
     Returns:
-        Err: the computed error
+        Err: The computed error as an Err instance.
     """
     err_prefix = 'temporary_error_prefix'
 
