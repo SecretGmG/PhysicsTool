@@ -1,7 +1,8 @@
 import numpy as np
 from .err import Err
 
-def linregress(x_values, y_data: Err):
+
+def linear_linregress(x_values, y_data: Err, compute_err_via_residuals = True):
     """
     Performs a weighted least squares (WLS) linear regression, where weights are inversely proportional 
     to the variance (squared errors) of the dependent variable (y_data.err). The function computes 
@@ -35,35 +36,65 @@ def linregress(x_values, y_data: Err):
     covariance matrix derived from the weighted residuals.
     """
     
-    # Add a constant (intercept term) to the independent variable
-    X = np.vstack((np.ones(x_values.shape[0]), x_values)).T  # Add column of ones for the intercept
-
-    # Create diagonal weight matrix from the inverse square of errors
-    weights = y_data.err ** -2
-    W = np.diag(weights)
-
-    # Perform Weighted Least Squares regression
-    XtWX = np.dot(np.dot(X.T, W), X)  # X^T * W * X
-    XtWy = np.dot(np.dot(X.T, W), y_data.mean)  # X^T * W * y
-    regression_coefficients = np.linalg.inv(XtWX).dot(XtWy)  # (X^T * W * X)^-1 * (X^T * W * y)
-
-    # Calculate residuals
-    predicted_y_values = X.dot(regression_coefficients)
-    residuals = y_data.mean - predicted_y_values
-
-    # Calculate the variance of residuals
-    residual_variance = np.sqrt((residuals.T @ (W / sum(W)) @ residuals) / (len(x_values) - 2))
-
-    # Covariance matrix for regression coefficients
-    cov_matrix = residual_variance * np.linalg.inv(XtWX)
-
-    # Standard errors of the coefficients
-    std_errors = np.sqrt(np.diag(cov_matrix))
-
-    # Return the slope, intercept, and the weighted centers
+    X = np.column_stack([np.ones_like(x_values), x_values])
+    features = weighted_least_squares_with_errors(X, y_data, compute_err_via_residuals)
+    
     return (
-        Err(regression_coefficients[1], std_errors[1]),  # slope and its error
-        Err(regression_coefficients[0], std_errors[0]),  # intercept and its error
-        np.average(x_values, weights=weights),  # weighted x_center
+        features[1],  # slope and its error
+        features[0],  # intercept and its error
+        np.average(x_values, weights=y_data.err**-2),  # weighted x_center
         y_data.weighted_average()  # weighted y_center (provided by Err class)
     )
+    
+def weighted_least_squares_with_errors(X, y_data, compute_err_via_residuals = True):
+    """
+    Perform weighted least squares linear regression and return both
+    the estimated coefficients and their standard errors.
+
+    Parameters:
+    X (np.ndarray): Design matrix (n_samples, n_features)
+    y (np.ndarray): Target values (n_samples, 1)
+    Sigma (np.ndarray): Covariance matrix of y (n_samples, n_samples)
+
+    Returns:
+    np.ndarray: Estimated coefficients (n_features, 1)
+    np.ndarray: Standard errors of the estimated coefficients (n_features, 1)
+    """
+
+    y = y_data.mean.reshape(-1,1)
+    Sigma = np.diag(y_data.err**2)
+    
+    # Compute the inverse of the covariance matrix Sigma
+    Sigma_inv = np.linalg.inv(Sigma)
+
+    # Calculate the weighted least squares solution
+    Xt_Sigma_inv = np.dot(X.T, Sigma_inv)
+    Xt_Sigma_inv_X_inv = np.linalg.inv(np.dot(Xt_Sigma_inv, X))
+    beta_hat = Xt_Sigma_inv_X_inv.dot(Xt_Sigma_inv).dot(y)
+
+    
+    beta_cov_matrix = Xt_Sigma_inv_X_inv
+    
+    # Compute residuals: y_pred = X @ beta_hat
+    y_pred = X @ beta_hat
+    residuals = y - y_pred
+
+    if compute_err_via_residuals:
+        # Compute the weighted residual sum of squares (RSS)
+        n = X.shape[0]  # Number of data points
+        m = X.shape[1]  # Number of features
+        rss_w = (residuals.T @ Sigma_inv @ residuals).item()  # Weighted RSS
+
+        # Compute residual variance
+        sigma_hat_squared = rss_w / (n - m)  # Variance term scaled by degrees of freedom
+        beta_cov_matrix *= sigma_hat_squared
+
+    # Compute the covariance matrix of beta_hat (incorporating Sigma and residual variance)
+
+    # The standard errors are the square roots of the diagonal of the covariance matrix
+    standard_errors = np.sqrt(np.diag(beta_cov_matrix))
+    
+    standard_errors = np.sqrt(np.diag(beta_cov_matrix))
+
+    return Err(beta_hat[:,0], standard_errors)
+
