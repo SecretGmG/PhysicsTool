@@ -1,8 +1,10 @@
 import numpy as np
+from typing import Literal
 from .err import Err
 
 
-def linear_linregress(x_values, y_data: Err, compute_err_via_residuals = True):
+
+def linear_linregress(x_values, y_data: Err, error_calculation: Literal['script', 'residuals', 'covariance']):
     """
     Performs a weighted least squares (WLS) linear regression, where weights are inversely proportional 
     to the variance (squared errors) of the dependent variable (y_data.err). The function computes 
@@ -36,8 +38,16 @@ def linear_linregress(x_values, y_data: Err, compute_err_via_residuals = True):
     covariance matrix derived from the weighted residuals.
     """
     
+    assert not np.any(y_data.err == 0), 'Errors must be non-zero'
+    
+    if error_calculation == 'script':
+        return practicum_script_linregress(x_values, y_data)
+    
+    
     X = np.column_stack([np.ones_like(x_values), x_values])
-    features = weighted_least_squares_with_errors(X, y_data, compute_err_via_residuals)
+    features = weighted_least_squares_with_errors(X, y_data, error_calculation)
+            
+    
     
     return (
         features[1],  # slope and its error
@@ -46,7 +56,7 @@ def linear_linregress(x_values, y_data: Err, compute_err_via_residuals = True):
         y_data.weighted_average()  # weighted y_center (provided by Err class)
     )
     
-def weighted_least_squares_with_errors(X, y_data, compute_err_via_residuals = True):
+def weighted_least_squares_with_errors(X, y_data, error_calculation: Literal['residuals', 'covariance']):
     """
     Perform weighted least squares linear regression and return both
     the estimated coefficients and their standard errors.
@@ -73,28 +83,39 @@ def weighted_least_squares_with_errors(X, y_data, compute_err_via_residuals = Tr
     beta_hat = Xt_Sigma_inv_X_inv.dot(Xt_Sigma_inv).dot(y)
 
     
-    beta_cov_matrix = Xt_Sigma_inv_X_inv
-    
-    # Compute residuals: y_pred = X @ beta_hat
-    y_pred = X @ beta_hat
-    residuals = y - y_pred
+    beta_cov_matrix = None
+    match error_calculation:
+        case 'covariance':
+            beta_cov_matrix = Xt_Sigma_inv_X_inv
+        case 'residuals':
+            # Compute residuals: y_pred = X @ beta_hat
+            y_pred = X @ beta_hat
+            residuals = y - y_pred
+            n = X.shape[0]  # Number of data points
+            m = X.shape[1]  # Number of features
+            rss_w = (residuals.T @ Sigma_inv @ residuals).item()  # Weighted RSS
 
-    if compute_err_via_residuals:
-        # Compute the weighted residual sum of squares (RSS)
-        n = X.shape[0]  # Number of data points
-        m = X.shape[1]  # Number of features
-        rss_w = (residuals.T @ Sigma_inv @ residuals).item()  # Weighted RSS
-
-        # Compute residual variance
-        sigma_hat_squared = rss_w / (n - m)  # Variance term scaled by degrees of freedom
-        beta_cov_matrix *= sigma_hat_squared
+            sigma_hat_squared = rss_w / (n - m)  # Variance term scaled by degrees of freedom
+            beta_cov_matrix = Xt_Sigma_inv_X_inv*sigma_hat_squared
+        
 
     # Compute the covariance matrix of beta_hat (incorporating Sigma and residual variance)
 
     # The standard errors are the square roots of the diagonal of the covariance matrix
     standard_errors = np.sqrt(np.diag(beta_cov_matrix))
-    
-    standard_errors = np.sqrt(np.diag(beta_cov_matrix))
 
     return Err(beta_hat[:,0], standard_errors)
 
+def practicum_script_linregress(x, y: Err):
+    n = len(x)
+    denominator = n*sum(x**2) - sum(x)**2
+    a = (n * sum(x*y.mean) - sum(x)*sum(y.mean)) / denominator
+    b = (sum(y.mean)*sum(x**2) - sum(x)*sum(x*y.mean)) / denominator
+    
+    D = sum((a*x + b - y.mean)**2)
+    s_y = np.sqrt(D / (n-2))
+    s_a = np.sqrt(D/n) / np.std(x, ddof=1)
+    
+    return Err(a, s_a), Err(b, s_y), np.mean(x), np.mean(y.mean)
+    
+    
