@@ -76,7 +76,7 @@ class Err:
     def bounds(self) -> tuple[np.ndarray, np.ndarray]:
         """
         Returns the upper and lower bounds for each measurement.
-        
+
         Returns:
             tuple: A tuple (lower_bound, upper_bound), where both elements are numpy arrays.
         """
@@ -198,7 +198,7 @@ class Err:
         Returns:
             str: A LaTeX-formatted string.
         '''
-        latex_strings = np.ravel(self.latex_array(err_sigfigs=err_sigfigs, relative=relative, delimiter=delimiter))
+        latex_strings = np.ravel(self.latex_array(err_sigfigs=err_sigfigs, val_sigfigs=val_sigfigs, relative=relative, delimiter=delimiter))
         return delimiter + r'\\'.join(latex_strings) + delimiter
 
     def toString(self, err_sigfigs: int = 2, val_sigfigs: int = 5, relative: bool = False, expontent_factor: int = 3) -> str:
