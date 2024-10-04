@@ -252,7 +252,7 @@ class Err:
 
         for i, (val, error) in enumerate(zip(mean_flat, err_flat)):
             # Calculate the exponent based on the mean value
-            mean_exponent = int(np.floor(np.log10(abs(val)) / expontent_factor) * expontent_factor)
+            mean_exponent = 0 if expontent_factor <= 0 else int(np.floor(np.log10(abs(val)) / expontent_factor) * expontent_factor)
 
             # Determine the number of significant digits for the error
             if error != 0:
