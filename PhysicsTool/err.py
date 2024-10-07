@@ -200,7 +200,7 @@ class Err:
             str: A LaTeX-formatted string.
         '''
         latex_strings = np.ravel(self.latex_array(err_sigfigs=err_sigfigs, val_sigfigs=val_sigfigs, relative=relative, delimiter=delimiter))
-        return delimiter + r'\\'.join(latex_strings) + delimiter
+        return r'\\'.join(latex_strings)
 
     def toString(self, err_sigfigs: int = 2, val_sigfigs: int = 5, relative: bool = False, expontent_factor: int = 3) -> str:
         '''
