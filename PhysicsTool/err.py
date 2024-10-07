@@ -143,6 +143,7 @@ class Err:
 
     def latex_array(self,
                     err_sigfigs: int = 2,
+                    val_sigfigs: int = 5,
                     relative: bool = False,
                     delimiter = '$'
                     ) -> ArrayLike:
@@ -157,7 +158,7 @@ class Err:
         Returns:
             ArrayLike: A numpy array containing LaTeX-formatted strings.
         '''
-        formatted_mean, formatted_err, exponents = self._format_sci(err_sigfigs, relative)
+        formatted_mean, formatted_err, exponents = self._format_sci(err_sigfigs,val_sigfigs, relative)
         latex_strings = np.vectorize(
             lambda m, e, exp: f'{delimiter}({m} \\pm {e}{'\\%' if relative else ''}) \\times 10^{{{exp}}}{delimiter}' if exp != 0 else f'{delimiter}{m} \\pm {e}{delimiter}{'\\%' if relative else ''}'
         )(formatted_mean, formatted_err, exponents)
