@@ -145,6 +145,7 @@ class Err:
                     err_sigfigs: int = 2,
                     val_sigfigs: int = 5,
                     relative: bool = False,
+                    expontent_factor: int = 3,
                     delimiter = '$'
                     ) -> ArrayLike:
         '''
@@ -158,14 +159,19 @@ class Err:
         Returns:
             ArrayLike: A numpy array containing LaTeX-formatted strings.
         '''
-        formatted_mean, formatted_err, exponents = self._format_sci(err_sigfigs,val_sigfigs, relative)
+        formatted_mean, formatted_err, exponents = self._format_sci(err_sigfigs=err_sigfigs,val_sigfigs=val_sigfigs, relative=relative, expontent_factor=expontent_factor)
         latex_strings = np.vectorize(
             lambda m, e, exp: f'{delimiter}({m} \\pm {e}{'\\%' if relative else ''}) \\times 10^{{{exp}}}{delimiter}' if exp != 0 else f'{delimiter}{m} \\pm {e}{delimiter}{'\\%' if relative else ''}'
         )(formatted_mean, formatted_err, exponents)
         
         return latex_strings
     
-    def string_array(self, err_sigfigs: int = 2, val_sigfigs: int = 5, relative: bool = False, expontent_factor: int = 3) -> ArrayLike:
+    def string_array(self, 
+                     err_sigfigs: int = 2, 
+                     val_sigfigs: int = 5, 
+                     relative: bool = False, 
+                     expontent_factor: int = 3
+                     ) -> ArrayLike:
         '''
         Returns a numpy string array formatted in scientific notation for all elements.
 
@@ -186,7 +192,13 @@ class Err:
         
         return strings
 
-    def latex(self, err_sigfigs: int = 2, val_sigfigs: int = 5, relative: bool = False, delimiter: str = '$') -> str:
+    def latex(self,
+              err_sigfigs: int = 2,
+              val_sigfigs: int = 5,
+              relative: bool = False,
+              expontent_factor: int = 3,
+              delimiter: str = '$'
+              ) -> str:
         '''
         Generates a LaTeX string for the error and mean values with customizable formatting.
 
@@ -199,7 +211,7 @@ class Err:
         Returns:
             str: A LaTeX-formatted string.
         '''
-        latex_strings = np.ravel(self.latex_array(err_sigfigs=err_sigfigs, val_sigfigs=val_sigfigs, relative=relative, delimiter=delimiter))
+        latex_strings = np.ravel(self.latex_array(err_sigfigs=err_sigfigs, val_sigfigs=val_sigfigs, relative=relative, delimiter=delimiter, expontent_factor = expontent_factor))
         return r'\\'.join(latex_strings)
 
     def toString(self, err_sigfigs: int = 2, val_sigfigs: int = 5, relative: bool = False, expontent_factor: int = 3) -> str:
