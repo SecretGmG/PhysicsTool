@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import sympy
 from numpy.typing import ArrayLike
 from sympy import Symbol, Expr, Function, Eq
@@ -51,6 +52,25 @@ class Err:
         mean = np.mean(data, axis)
         std_err = np.std(data, axis, ddof=1) / np.sqrt(np.size(data, axis))
         return cls(mean, std_err)
+
+    @classmethod
+    def from_dataframe(cls, df: pd.DataFrame) -> Self:
+        """
+        Creates an Err instance from a pandas DataFrame with 'mean' and 'error' columns.
+
+        Parameters:
+            df (pd.DataFrame): DataFrame containing 'mean' and 'error' columns.
+
+        Returns:
+            Err: An Err object with calculated mean and error.
+        """
+        if 'mean' not in df or 'error' not in df:
+            raise ValueError("DataFrame must contain 'mean' and 'error' columns.")
+        
+        mean = df['mean'].values
+        err = df['error'].values
+        return cls(mean, err)
+
 
     def apply(self, foo: Function | Expr) -> Self:
         '''
@@ -307,6 +327,31 @@ class Err:
 
     def __getitem__(self, indices):
         return Err(self.mean[indices], self.err[indices])
+    
+    def __len__(self):
+        """
+        Return the length of the first dimension of the Err object.
+        If the array is multi-dimensional, this returns the size of the first axis.
+        """
+        return self.mean.shape[0]
+
+    def __iter__(self):
+        """
+        Allows the Err object to be treated as an iterable (iterating over its elements).
+        This makes it compatible with pandas when assigned to a DataFrame column.
+        If the Err object is multi-dimensional, this flattens the object, yielding
+        Err objects for each element.
+        """
+        # Flatten along the first dimension and iterate over that
+        for i in range(self.mean.shape[0]):
+            yield self[i]  # Return an Err object for each "row" or slice
+
+    def flatten(self):
+        """
+        Flattens the Err object into 1D. Returns an Err object where mean and err are 1D arrays.
+        This is useful for handling multi-dimensional cases.
+        """
+        return Err(self.mean.flatten(), self.err.flatten())
     
     def __add__(self, other):
         a, b = sympy.symbols('a,b')
