@@ -22,7 +22,7 @@ def _get_tex_df(df: pd.DataFrame, caption: str = "Caption", label: str = "tab:la
     
     df = df.copy()
     from .err import Err
-    df.map(
+    df = df.map(
         lambda e: e.latex() if type(e) is Err else e
     )
     h = r"\begin{table}[H]" + "\n" + r"\centering" + "\n"
