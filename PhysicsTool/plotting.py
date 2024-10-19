@@ -2,37 +2,59 @@ import matplotlib.pyplot as plt
 from numpy.typing import ArrayLike
 from typing import Optional
 
-def start_plt(title: str, xlabel: str, ylabel: str, grid: bool = True) -> None:
+import matplotlib.pyplot as plt
+
+import matplotlib.pyplot as plt
+
+def start_plt(title: str, xlabel: str, ylabel: str, grid: bool = True, ax=None, 
+              fontsize: int = 13, labelsize: int = 12, ticksize: int = 11) -> None:
     """
     Set up the title, xlabel, ylabel, and grid for the matplotlib plot.
-
+    
     Parameters:
         title (str): The title of the plot.
         xlabel (str): The label for the x-axis.
         ylabel (str): The label for the y-axis.
         grid (bool, optional): Whether to display grid lines on the plot. Defaults to True.
-
+        ax (matplotlib.axes.Axes, optional): The axis to apply the settings to. Defaults to the current axis.
+        fontsize (int, optional): Font size for the title. Defaults to 14.
+        labelsize (int, optional): Font size for the axis labels. Defaults to 12.
+        ticksize (int, optional): Font size for the tick labels. Defaults to 11.
+    
     Returns:
         None
     """
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.grid(grid)
+    if ax is None:
+        ax = plt.gca()
 
+    ax.set_title(title, fontsize=fontsize)
+    ax.set_xlabel(xlabel, fontsize=labelsize)
+    ax.set_ylabel(ylabel, fontsize=labelsize)
 
-def end_plt(show: bool = True, legend_loc: str = 'best') -> None:
+    # Set the x and y axis tick label font sizes
+    ax.tick_params(axis='x', labelsize=ticksize)
+    ax.tick_params(axis='y', labelsize=ticksize)
+
+    ax.grid(grid)
+
+def end_plt(show: bool = True, legend_loc: str = 'best', legend_fontsize: int = 12, ax=None) -> None:
     """
     Finalize the matplotlib plot settings, display the legend, and optionally display the plot.
-
+    
     Parameters:
         show (bool, optional): Whether to display the plot. Defaults to True.
         legend_loc (str, optional): The location of the legend on the plot. Defaults to 'best'.
-
+        legend_fontsize (int, optional): Font size for the legend text. Defaults to 12.
+        ax (matplotlib.axes.Axes, optional): The axis to apply the settings to. Defaults to the current axis.
+    
     Returns:
         None
     """
-    plt.legend(loc=legend_loc)
+    if ax is None:
+        ax = plt.gca()
+
+    ax.legend(loc=legend_loc, fontsize=legend_fontsize)
+
     if show:
         plt.show()
 
