@@ -403,6 +403,7 @@ def derive_err(
     values: Optional[List[Symbol]] = None,
     target_symbol: Symbol = Symbol('f'),
     err_prefix: str = 's',
+    relative = False,
     do_display: bool = False,
     tex: Optional[TextIO] = None
 ) -> Expr:
@@ -418,6 +419,7 @@ def derive_err(
         target_symbol (Optional[Symbol]): The symbol of the expression to calculate the Gaussian error for. 
             Only used for logging. Defaults to 'f'.
         err_prefix (str): The string every error term is prefixed with. Defaults to 's'.
+        relative (bool): all errors should be treated as relative
         do_display (bool) : wether to display the calculation and some of its intermediate result to the IPython output.
         tex (Optional[TextIO]): A file object to write LaTeX representation into. 
             Often it is useful to set this to sys.stdout. Defaults to None. 
@@ -436,11 +438,14 @@ def derive_err(
 
     target_function = Function(target_symbol)(*free_args)
     temp_err_squared_expr = sympy.S.Zero
-    temp_exprs, diff_exprs, diff_res_exprs = [], [], []
+    temp_exprs, diff_exprs, diff_res_exprs, s_args = [], [], []
 
     for arg in free_args:
         t, s_arg = sympy.symbols(f'temp_{arg}, {err_prefix}_{arg}')
-        temp_err_squared_expr += t ** 2 * s_arg**2
+        if relative:
+            temp_err_squared_expr += t ** 2 * s_arg**2 * arg**2
+        else:
+            temp_err_squared_expr += t ** 2 * s_arg**2
         d = sympy.diff(target_function, arg, evaluate=False)
         temp_exprs.append(t)
         diff_exprs.append(d)
@@ -453,8 +458,13 @@ def derive_err(
         evaluate=False), do_display, tex)
 
     with sympy.evaluate(False):
-        err_squared_expr = temp_err_squared_expr.subs(
-            zip(temp_exprs, diff_res_exprs))
+        if relative:
+            err_squared_expr = temp_err_squared_expr.subs(
+                zip(temp_exprs, diff_res_exprs)) / expr**2
+        else:
+            err_squared_expr = temp_err_squared_expr.subs(
+                zip(temp_exprs, diff_res_exprs))
+            
         log(Eq(target_err_symbol_squared, err_squared_expr), do_display, tex)
 
     err_expr = sympy.sqrt(err_squared_expr)
