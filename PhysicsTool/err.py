@@ -438,7 +438,7 @@ def derive_err(
 
     target_function = Function(target_symbol)(*free_args)
     temp_err_squared_expr = sympy.S.Zero
-    temp_exprs, diff_exprs, diff_res_exprs, s_args = [], [], []
+    temp_exprs, diff_exprs, diff_res_exprs = [], [], []
 
     for arg in free_args:
         t, s_arg = sympy.symbols(f'temp_{arg}, {err_prefix}_{arg}')
