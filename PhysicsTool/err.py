@@ -428,7 +428,9 @@ def derive_err(
         Expr: The expression for the absolute Gaussian error
     '''
     from .logging import log
+
     target_err_symbol = Symbol(f'{err_prefix}_{target_symbol}')
+        
     target_err_symbol_squared = target_err_symbol ** 2
 
     if values is not None:
@@ -436,6 +438,7 @@ def derive_err(
     else:
         free_args = list(expr.free_symbols)
 
+    
     target_function = Function(target_symbol)(*free_args)
     temp_err_squared_expr = sympy.S.Zero
     temp_exprs, diff_exprs, diff_res_exprs = [], [], []
@@ -451,24 +454,27 @@ def derive_err(
         diff_exprs.append(d)
         diff_res_exprs.append(d.subs(target_function, expr).doit())
 
+
+    if relative:
+        with sympy.evaluate(False):
+            temp_err_squared_expr /= expr**2
+    
     diff_err_squared_expr = temp_err_squared_expr.subs(
         list(zip(temp_exprs, diff_exprs)), evaluate=False)
-
+    
     log(Eq(target_err_symbol_squared, diff_err_squared_expr,
-        evaluate=False), do_display, tex)
-
+            evaluate=False), do_display, tex)
+        
     with sympy.evaluate(False):
-        if relative:
-            err_squared_expr = temp_err_squared_expr.subs(
-                zip(temp_exprs, diff_res_exprs)) / expr**2
-        else:
-            err_squared_expr = temp_err_squared_expr.subs(
-                zip(temp_exprs, diff_res_exprs))
-            
+        err_squared_expr = temp_err_squared_expr.subs(
+            zip(temp_exprs, diff_res_exprs))
+        
         log(Eq(target_err_symbol_squared, err_squared_expr), do_display, tex)
-
+            
     err_expr = sympy.sqrt(err_squared_expr)
+    
     log(Eq(target_err_symbol, err_expr, evaluate=False), do_display, tex)
+    
     return err_expr
 
 
