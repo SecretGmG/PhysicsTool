@@ -24,7 +24,7 @@ class Err:
                 If None, the errors are set to zero or extracted if 'mean' contains 
                 Err instances.
         '''
-        mean = np.asarray(mean)
+        mean = np.asarray(mean, dtype=np.float256)
         if err is None:
             if isinstance(mean.ravel()[0],Err):
                 err = np.vectorize(lambda e: e.err)(mean)
@@ -325,7 +325,7 @@ class Err:
             exponents[i] = mean_exponent
 
         # Handle edge case when error is 0
-        mask = np.isclose(self.err, 0)
+        mask = np.abs(self.err) < np.finfo(self.err.dtype)
         formatted_errs[mask] = '0'
 
         # Reshape back to the original shape of the input arrays
