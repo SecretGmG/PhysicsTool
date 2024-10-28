@@ -24,7 +24,7 @@ class Err:
                 If None, the errors are set to zero or extracted if 'mean' contains 
                 Err instances.
         '''
-        mean = np.asarray(mean, dtype=np.float64)
+        mean = np.asarray(mean)
         if err is None:
             if isinstance(mean.ravel()[0],Err):
                 err = np.vectorize(lambda e: e.err)(mean)
@@ -34,8 +34,8 @@ class Err:
         
         mean, err = np.broadcast_arrays(mean, err)
         
-        self.mean = np.atleast_1d(np.array(mean))
-        self.err = np.atleast_1d(np.array(err))
+        self.mean = np.atleast_1d(np.array(mean)).astype(np.float64)
+        self.err = np.atleast_1d(np.array(err)).astype(np.float64)
 
     @classmethod
     def from_data(cls, data: ArrayLike, axis: Optional[int] = None) -> Self:
