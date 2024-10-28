@@ -325,7 +325,7 @@ class Err:
             exponents[i] = mean_exponent
 
         # Handle edge case when error is 0
-        mask = np.abs(self.err) < np.finfo(self.err.dtype).eps
+        mask = np.abs(self.err) = 0
         formatted_errs[mask] = '0'
 
         # Reshape back to the original shape of the input arrays
