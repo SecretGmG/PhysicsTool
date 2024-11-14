@@ -14,7 +14,11 @@ class Err:
         mean (np.ndarray): The mean values of the measurements.
         err (np.ndarray): The errors associated with the measurements.
     '''
-    def __init__(self, mean: ArrayLike, err : ArrayLike = None):
+    
+    relative : bool
+    
+    
+    def __init__(self, mean: ArrayLike, err : ArrayLike = None, format = None):
         '''
         Initializes an Err object with mean values and associated errors.
 
@@ -24,6 +28,10 @@ class Err:
                 If None, the errors are set to zero or extracted if 'mean' contains 
                 Err instances.
         '''
+        if format is None:
+            from PhysicsTool.err_format import SCI_FORMAT
+            format = SCI_FORMAT
+            
         mean = np.asarray(mean)
         if err is None:
             if isinstance(mean.ravel()[0],Err):
@@ -36,9 +44,11 @@ class Err:
         
         self.mean = np.atleast_1d(np.array(mean)).astype(np.float64)
         self.err = np.atleast_1d(np.array(err)).astype(np.float64)
+        
+        self.format = format
 
     @classmethod
-    def from_data(cls, data: ArrayLike, axis: Optional[int] = None) -> Self:
+    def from_data(cls, data: ArrayLike, axis: Optional[int] = None, format = None) -> Self:
         '''
         Creates an Err instance from raw data by calculating the mean and standard error.
 
@@ -51,10 +61,10 @@ class Err:
         '''
         mean = np.mean(data, axis)
         std_err = np.std(data, axis, ddof=1) / np.sqrt(np.size(data, axis))
-        return cls(mean, std_err)
+        return cls(mean, std_err, format = format)
 
     @classmethod
-    def from_dataframe(cls, df: pd.DataFrame) -> Self:
+    def from_dataframe(cls, df: pd.DataFrame, format = None) -> Self:
         """
         Creates an Err instance from a pandas DataFrame with 'mean' and 'error' columns.
 
@@ -69,7 +79,7 @@ class Err:
         
         mean = df['mean'].values
         err = df['error'].values
-        return cls(mean, err)
+        return cls(mean, err, format = format)
 
 
     def apply(self, foo: Function | Expr) -> Self:
@@ -92,7 +102,7 @@ class Err:
         
         mean_result = sympy.lambdify(x, foo)(self.mean)
         err_result = sympy.lambdify(x, sympy.Abs(sympy.diff(foo, x)))(self.mean) * self.err
-        return Err(mean_result, err_result)
+        return Err(mean_result, err_result, self.format)
     def bounds(self) -> tuple[np.ndarray, np.ndarray]:
         """
         Returns the upper and lower bounds for each measurement.
@@ -143,7 +153,7 @@ class Err:
         '''
         mean_avg = self.mean.mean(axis=axis)
         err_avg = np.sqrt(np.sum(self.err ** 2, axis=axis)) / np.size(self.err, axis=axis)
-        return Err(mean_avg, err_avg)
+        return Err(mean_avg, err_avg, format = self.format)
 
     def weighted_average(self, axis=None) -> Self:
         '''
@@ -159,180 +169,42 @@ class Err:
         mean_weighted_avg = np.sum(self.mean * weights, axis=axis) / np.sum(weights, axis=axis)
         # source: https://www.physics.umd.edu/courses/Phys261/F06/ErrorPropagation.pdf
         err_weighted_avg = np.sqrt(1 / np.sum(weights, axis=axis))
-        return Err(mean_weighted_avg, err_weighted_avg)
-
-    def latex_array(self,
-                    err_sigfigs: int = 2,
-                    val_sigfigs: int = 5,
-                    relative: bool = False,
-                    expontent_factor: int = 3,
-                    delimiter = '$'
-                    ) -> ArrayLike:
-        '''
-        Generates a numpy string array with LaTeX-formatted scientific notation for all elements.
-
-        Parameters:
-            err_sigfigs (int): Number of significant figures for the error.
-            relative (bool): Whether to format errors as relative percentages.
-            delimiter (str): The delimiter used to enclose LaTeX expressions.
-
-        Returns:
-            ArrayLike: A numpy array containing LaTeX-formatted strings.
-        '''
-        formatted_mean, formatted_err, exponents = self._format_sci(err_sigfigs=err_sigfigs,val_sigfigs=val_sigfigs, relative=relative, expontent_factor=expontent_factor)
-        latex_strings = np.vectorize(
-            lambda m, e, exp: f'{delimiter}({m} \\pm {e}{'\\%' if relative else ''}) \\times 10^{{{exp}}}{delimiter}' if exp != 0 else f'{delimiter}{m} \\pm {e}{delimiter}{'\\%' if relative else ''}'
-        )(formatted_mean, formatted_err, exponents)
-        
-        return latex_strings
-    
-    def string_array(self, 
-                     err_sigfigs: int = 2, 
-                     val_sigfigs: int = 5, 
-                     relative: bool = False, 
-                     expontent_factor: int = 3
-                     ) -> ArrayLike:
-        '''
-        Returns a numpy string array formatted in scientific notation for all elements.
-
-        Parameters:
-            err_sigfigs (int): Number of significant figures for the error.
-            val_sigfigs (int): Number of significant figures for the value.
-            relative (bool): Whether to format errors as relative percentages.
-            expontent_factor (int): The factor used to scale exponents (typically 3 for scientific notation).
-
-        Returns:
-            ArrayLike: A numpy array containing formatted strings.
-        '''
-        formatted_mean, formatted_err, exponents = self._format_sci(err_sigfigs, val_sigfigs, relative, expontent_factor)
-        
-        strings = np.vectorize(
-            lambda m, e, exp: f'({m} ± {e}{'%' if relative else ''}) × 10^{exp}' if exp != 0 else f'{m} ± {e}{'%' if relative else ''}'
-        )(formatted_mean, formatted_err, exponents)
-        
-        return strings
-
-    def latex(self,
-              err_sigfigs: int = 2,
-              val_sigfigs: int = 5,
-              relative: bool = False,
-              expontent_factor: int = 3,
-              delimiter: str = '$'
+        return Err(mean_weighted_avg, err_weighted_avg, format = self.format)
+    def latex(self, delimiter: str = '$'
               ) -> str:
         '''
         Generates a LaTeX string for the error and mean values with customizable formatting.
 
         Parameters:
-            err_sigfigs (int): Number of significant figures for the error.
-            val_sigfigs (int): Number of significant figures for the value.
-            relative (bool): Whether to format errors as relative percentages.
             delimiter (str): The delimiter used to enclose LaTeX expressions.
 
         Returns:
             str: A LaTeX-formatted string.
         '''
-        latex_strings = np.ravel(self.latex_array(err_sigfigs=err_sigfigs, val_sigfigs=val_sigfigs, relative=relative, delimiter=delimiter, expontent_factor = expontent_factor))
-        return r'\\'.join(latex_strings)
+        return r'\\'.join(np.ravel(self.format.latex_array(self, delimiter)))
 
-    def toString(self, err_sigfigs: int = 2, val_sigfigs: int = 5, relative: bool = False, expontent_factor: int = 3) -> str:
+    def toString(self) -> str:
         '''
         Generates a string representation of the error and mean values with customizable formatting.
-
-        Parameters:
-            err_sigfigs (int): Number of significant figures for the error.
-            val_sigfigs (int): Number of significant figures for the value.
-            relative (bool): Whether to format errors as relative percentages.
-            expontent_factor (int): The factor used to scale exponents (typically 3 for scientific notation).
-
+        
         Returns:
             str: A formatted string.
         '''
-        string_array = np.ravel(self.string_array(err_sigfigs=err_sigfigs, val_sigfigs=val_sigfigs, relative=relative, expontent_factor=expontent_factor))
-        return '\n'.join(string_array)
+        return '\n'.join(np.ravel(self.format.string_array(self)))
 
     def __repr__(self):
         '''
         String representation of the Err object, showing its contents as formatted strings.
         '''
-        return '\n'.join(np.ravel(self.string_array()))
+        return self.toString()
     def _repr_latex_(self):
         '''
         Pretty LaTeX representation for Jupyter notebooks, using LaTeX formatting.
         '''
-        return '$' + r'\\'.join(np.ravel(self.latex_array(delimiter = ''))) + '$'
-
-    def _format_sci(self, err_sigfigs: int = 2, val_sigfigs: int = 5, relative: bool = False, expontent_factor: int = 3) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        '''
-        Helper function to format mean and error values in scientific notation.
-
-        Parameters:
-            err_sigfigs (int): Number of significant figures for the error.
-            val_sigfigs (int): Number of significant figures for the mean value.
-            relative (bool): Whether to format errors as relative percentages.
-            expontent_factor (int): The factor to use for scaling exponents.
-
-        Returns:
-            tuple: Formatted mean, error, and exponents as numpy arrays.
-        '''
-        
-        formatted_means = np.empty_like(self.mean, dtype=object)
-        formatted_errs = np.empty_like(self.err, dtype=object)
-        exponents = np.empty_like(self.mean, dtype=int)
-
-        # Flatten the arrays to handle both 1D and scalar inputs.
-        mean_flat = np.ravel(self.mean)
-        err_flat = np.ravel(self.err)
-
-        for i, (val, error) in enumerate(zip(mean_flat, err_flat)):
-            # Calculate the exponent based on the mean value
-            mean_exponent = 0
-            if expontent_factor <= 0:
-                mean_exponent = 0
-            elif val != 0:
-                mean_exponent = int(np.floor(np.log10(abs(val)) / expontent_factor) * expontent_factor)
-            elif error != 0:
-                mean_exponent = int(np.floor(np.log10(abs(error)) / expontent_factor) * expontent_factor)
-                
-            # Determine the number of significant digits for the error
-            if error != 0:
-                error_exponent = int(np.floor(np.log10(abs(error))))
-                precision = err_sigfigs - error_exponent - 1
-            else:
-                precision = val_sigfigs - mean_exponent - 1
-
-            mantissa_mean = val / np.power(10.0,mean_exponent)
-            mantissa_err = error / np.power(10.0,mean_exponent)
-            
-            matntissa_precision = mean_exponent+precision
-
-            # Format mean and error based on their precision
-            if matntissa_precision > 0:
-                formatted_means[i] = f'{mantissa_mean:.{matntissa_precision}f}'
-                formatted_errs[i] = f'{mantissa_err:.{matntissa_precision}f}'
-            else:
-                formatted_means[i] = f'{int(mantissa_mean):d}'
-                formatted_errs[i] = f'{int(mantissa_err):d}'
-            
-            if relative and error != 0:
-                relative_error = 100*mantissa_err/mantissa_mean
-                relative_error_exponent = int(np.floor(np.log10(abs(relative_error))))
-                relative_error_precision = err_sigfigs - relative_error_exponent - 1
-                if relative_error_precision > 0:
-                    formatted_errs[i] = f'{relative_error:.{relative_error_precision}f}'
-                else:
-                    formatted_errs[i] = f'{int(relative_error):d}'
-                
-            exponents[i] = mean_exponent
-
-        # Handle edge case when error is 0
-        mask = np.abs(self.err) == 0
-        formatted_errs[mask] = '0'
-
-        # Reshape back to the original shape of the input arrays
-        return formatted_means.reshape(self.mean.shape), formatted_errs.reshape(self.err.shape), exponents.reshape(self.mean.shape)
+        return '$' + self.latex('') + '$'
 
     def __getitem__(self, indices):
-        return Err(self.mean[indices], self.err[indices])
+        return Err(self.mean[indices], self.err[indices], format=self.format)
     
     def __len__(self):
         """
@@ -361,72 +233,122 @@ class Err:
     
     def __add__(self, other):
         a, b = sympy.symbols('a,b')
-        return calc_err(a+b, {a: self, b: other})
+        out = calc_err(a+b, {a: self, b: other})
+        out.format = _combine_format(self, other)        
+        return out
 
     def __sub__(self, other):
         a, b = sympy.symbols('a,b')
-        return calc_err(a-b, {a: self, b: other})
+        out = calc_err(a-b, {a: self, b: other})
+        out.format = _combine_format(self, other)
+        return out
 
     def __mul__(self, other):
         a, b = sympy.symbols('a,b')
-        return calc_err(a*b, {a: self, b: other})
+        out = calc_err(a*b, {a: self, b: other})
+        out.format = _combine_format(self, other)
+        return out
 
     def __pow__(self, other):
         a, b = sympy.symbols('a,b')
-        return calc_err(a**b, {a: self, b: other})
+        out = calc_err(a**b, {a: self, b: other})
+        out.format = _combine_format(self, other)
+        return out
 
     def __truediv__(self, other):
         a, b = sympy.symbols('a,b')
-        return calc_err(a/b, {a: self, b: other})
+        out = calc_err(a/b, {a: self, b: other})
+        out.format = _combine_format(self, other)
+        return out
     def __radd__(self, other):
         a, b = sympy.symbols('a,b')
-        return calc_err(b+a, {a: self, b: other})
+        out = calc_err(b+a, {a: self, b: other})
+        out.format = _combine_format(self, other)
+        return out
 
     def __rsub__(self, other):
         a, b = sympy.symbols('a,b')
-        return calc_err(b-a, {a: self, b: other})
+        out = calc_err(b-a, {a: self, b: other})
+        out.format = _combine_format(self, other)
+        return out
 
     def __rmul__(self, other):
         a, b = sympy.symbols('a,b')
-        return calc_err(b*a, {a: self, b: other})
+        out = calc_err(b*a, {a: self, b: other})
+        out.format = _combine_format(self, other)
+        return out
 
     def __rpow__(self, other):
         a, b = sympy.symbols('a,b')
-        return calc_err(b**a, {a: self, b: other})
+        out = calc_err(b**a, {a: self, b: other})
+        out.format = _combine_format(self, other)
+        return out
 
     def __rtruediv__(self, other):
         a, b = sympy.symbols('a,b')
-        return calc_err(b/a, {a: self, b: other})
+        out = calc_err(b/a, {a: self, b: other})
+        out.format = _combine_format(self, other)
+        return out
+
+
+def _combine_format(a, b):
+    if isinstance(a, Err) and isinstance(b, Err):
+        return a.format.combine(b.format)
+    if isinstance(a, Err):
+        return a.format
+    if isinstance(b, Err):
+        return b.format
+    from err_format import SCI_FORMAT
+    return SCI_FORMAT
 
 def derive_err(
     expr: Expr,
     values: Optional[List[Symbol]] = None,
     target_symbol: Symbol = Symbol('f'),
     err_prefix: str = 's',
-    relative = False,
+    relative: bool = False,
     do_display: bool = False,
     tex: Optional[TextIO] = None
 ) -> Expr:
     '''
-    Derives the absolute Gaussian error from an expression.
+    Derives the absolute or relative Gaussian error from an expression, based on propagation rules.
 
-    This function calculates the absolute Gaussian error for the given expression.
+    This function calculates the Gaussian error for the given expression by computing
+    the error contribution from each variable. For each variable, it computes the partial derivative 
+    with respect to that variable, squares it, and multiplies it by the square of the associated error.
+    The results are summed and then square-rooted to yield the total error expression.
+
+    If `relative` is set to `True`, each term is additionally multiplied by the square of the variable's 
+    value, giving the relative error propagation form. This is useful for proportional errors 
+    or when error terms are intended as percentages of the mean values.
 
     Parameters:
-        expr Expr: The expression to calculate the absolute Gaussian error for.
-        values (Optional[List[Symbol]]): A list of values witch should be included in the error estimation. 
-            If None, every free symbol is included. Defaults to None.
-        target_symbol (Optional[Symbol]): The symbol of the expression to calculate the Gaussian error for. 
-            Only used for logging. Defaults to 'f'.
-        err_prefix (str): The string every error term is prefixed with. Defaults to 's'.
-        relative (bool): all errors should be treated as relative
-        do_display (bool) : wether to display the calculation and some of its intermediate result to the IPython output.
-        tex (Optional[TextIO]): A file object to write LaTeX representation into. 
-            Often it is useful to set this to sys.stdout. Defaults to None. 
+        expr (Expr): The sympy expression to calculate the Gaussian error for.
+        values (Optional[List[Symbol]]): A list of symbols to include in error estimation. 
+            If None, all free symbols in `expr` are used. Defaults to None.
+        target_symbol (Symbol): Symbol representing the final expression for logging purposes.
+            Defaults to 'f'.
+        err_prefix (str): Prefix for the symbol names representing each variable's error term.
+            Defaults to 's'.
+        relative (bool): Whether to treat all errors as relative to the values they measure.
+            When True, each error term is scaled by the variable's value in `expr`.
+            Defaults to False.
+        do_display (bool): Whether to display the calculation and intermediate results in
+            IPython output. Useful for debugging or documentation. Defaults to False.
+        tex (Optional[TextIO]): File object to write LaTeX representation into, often
+            set to `sys.stdout` for console output. Defaults to None. 
 
     Returns:
-        Expr: The expression for the absolute Gaussian error
+        Expr: The sympy expression for the Gaussian error in `expr`.
+    
+    Example:
+        To calculate the error of an expression with relative errors:
+
+            x, y = sympy.symbols('x y')
+            expr = x * y
+            error_expr = derive_err(expr, relative=True)
     '''
+
     from .logging import log
 
     target_err_symbol = Symbol(f'{err_prefix}_{target_symbol}')
@@ -479,7 +401,7 @@ def derive_err(
 
 
 def calc_err(expr: sympy.Expr,
-             values: Dict[sympy.Symbol, Err | ArrayLike]
+             values: Dict[sympy.Symbol, Err | ArrayLike],
              ) -> Err:
     '''
     Calculates the error of the given expression applied to the given values.
