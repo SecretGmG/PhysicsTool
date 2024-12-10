@@ -136,10 +136,16 @@ class ErrFormat:
         Returns:
             np.ndarray: An array of formatted strings in LaTeX format.
         """
+        
+        def format_to_latex(m, e, exp):
+            if exp != 0:
+                return rf'{delimiter}({m} \pm {e}{r"\%" if self.relative else ""}) \times 10^{{{exp}}}{delimiter}'
+            else:
+                return rf'{delimiter}{m} \pm {e}{delimiter}{r"\%" if self.relative else ""}'
+        
+        
         formatted_mean, formatted_err, exponents = self._format(err)
-        latex_strings = np.vectorize(
-            lambda m, e, exp: f'{delimiter}({m} \\pm {e}{"\\%" if self.relative else ""}) \\times 10^{{{exp}}}{delimiter}' if exp != 0 else f'{delimiter}{m} \\pm {e}{delimiter}{"\\%" if self.relative else ""}'
-        )(formatted_mean, formatted_err, exponents)
+        latex_strings = np.vectorize(format_to_latex)(formatted_mean, formatted_err, exponents)
 
         return latex_strings
 
@@ -153,10 +159,14 @@ class ErrFormat:
         Returns:
             np.ndarray: An array of formatted strings in plain text format.
         """
+        def format_to_string(m, e, exp):
+            if exp != 0:
+                return f'({m} ± {e}{"%" if self.relative else ""}) × 10^{exp}'
+            else:
+                return f'{m} ± {e}{"%" if self.relative else ""}'
+        
         formatted_mean, formatted_err, exponents = self._format(err)
-        strings = np.vectorize(
-            lambda m, e, exp: f'({m} ± {e}{"%" if self.relative else ""}) × 10^{exp}' if exp != 0 else f'{m} ± {e}{"%" if self.relative else ""}'
-        )(formatted_mean, formatted_err, exponents)
+        strings = np.vectorize(format_to_string)(formatted_mean, formatted_err, exponents)
 
         return strings
 

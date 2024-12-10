@@ -31,7 +31,11 @@ class Err:
         if format is None:
             from PhysicsTool.err_format import SCI_FORMAT
             format = SCI_FORMAT
-            
+        
+        if isinstance(mean, Err):
+            err = mean.err
+            mean = mean.mean
+        
         mean = np.asarray(mean)
         if err is None:
             if isinstance(mean.ravel()[0],Err):
@@ -413,20 +417,26 @@ def calc_err(expr: sympy.Expr,
     Returns:
         Err: The computed error as an Err instance.
     '''
+    
     err_prefix = 'temporary_error_prefix'
 
     mean_values = {}
     err_values = {}
     
+    missing_symbols = [symbol for symbol in expr.free_symbols if symbol not in values]
+    if missing_symbols:
+        raise ValueError(f"Missing value for required symbols: {', '.join([f"'{s}'" for s in missing_symbols])}")
+    
+    #cast all values to errors
     for key, val in values.items():
-        if not isinstance(val, Err):
-            values[key] = Err(val)
+        values[key] = Err(val)
             
     for key, val in values.items():
         mean_values[key] = val.mean
         err_values[Symbol(f'{err_prefix}_{key}')] = val.err
 
     all_values = mean_values | err_values
+    
     err_expr = derive_err(expr, mean_values.keys(), err_prefix=err_prefix)
 
     mean_func = sympy.lambdify(all_values.keys(), expr)
