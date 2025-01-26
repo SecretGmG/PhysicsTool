@@ -52,7 +52,8 @@ def end_plt(legend_loc: str = 'best', legend_fontsize: int = 12, ax=None) -> Non
     if ax is None:
         ax = plt.gca()
 
-    if ax.get_legend():
+    handles, labels = ax.get_legend_handles_labels()
+    if labels:
         ax.legend(loc=legend_loc, fontsize=legend_fontsize)
 
 def err_band_plot(x: ArrayLike, y: ArrayLike, y_err: ArrayLike, label: Optional[str] = None, color: Optional[str] = None, ax: Optional[plt.Axes] = None) -> None:
