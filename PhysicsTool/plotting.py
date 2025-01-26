@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 import matplotlib.pyplot as plt
 
-def start_plt(title: str, xlabel: str, ylabel: str, grid: bool = True, ax=None, 
+def start_plt(title: str = '', xlabel: str = 'x', ylabel: str = 'y', grid: bool = True, ax=None, 
               fontsize: int = 13, labelsize: int = 12, ticksize: int = 11) -> None:
     """
     Set up the title, xlabel, ylabel, and grid for the matplotlib plot.
@@ -26,8 +26,8 @@ def start_plt(title: str, xlabel: str, ylabel: str, grid: bool = True, ax=None,
     """
     if ax is None:
         ax = plt.gca()
-
-    ax.set_title(title, fontsize=fontsize)
+    if title:
+        ax.set_title(title, fontsize=fontsize)
     ax.set_xlabel(xlabel, fontsize=labelsize)
     ax.set_ylabel(ylabel, fontsize=labelsize)
 
@@ -53,10 +53,11 @@ def end_plt(show: bool = True, legend_loc: str = 'best', legend_fontsize: int = 
     if ax is None:
         ax = plt.gca()
 
-    ax.legend(loc=legend_loc, fontsize=legend_fontsize)
+    if ax.get_legend():
+        ax.legend(loc=legend_loc, fontsize=legend_fontsize)
 
     if show:
-        plt.show()
+        plt.show(block = False)
 
 def err_band_plot(x: ArrayLike, y: ArrayLike, y_err: ArrayLike, label: Optional[str] = None, color: Optional[str] = None, ax: Optional[plt.Axes] = None) -> None:
     """
