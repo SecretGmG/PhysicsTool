@@ -37,12 +37,11 @@ def start_plt(title: str = '', xlabel: str = 'x', ylabel: str = 'y', grid: bool 
 
     ax.grid(grid)
 
-def end_plt(show: bool = True, legend_loc: str = 'best', legend_fontsize: int = 12, ax=None) -> None:
+def end_plt(legend_loc: str = 'best', legend_fontsize: int = 12, ax=None) -> None:
     """
-    Finalize the matplotlib plot settings, display the legend, and optionally display the plot.
+    Finalize the matplotlib plot settings, display the legend
     
     Parameters:
-        show (bool, optional): Whether to display the plot. Defaults to True.
         legend_loc (str, optional): The location of the legend on the plot. Defaults to 'best'.
         legend_fontsize (int, optional): Font size for the legend text. Defaults to 12.
         ax (matplotlib.axes.Axes, optional): The axis to apply the settings to. Defaults to the current axis.
@@ -55,9 +54,6 @@ def end_plt(show: bool = True, legend_loc: str = 'best', legend_fontsize: int = 
 
     if ax.get_legend():
         ax.legend(loc=legend_loc, fontsize=legend_fontsize)
-
-    if show:
-        plt.show(block = False)
 
 def err_band_plot(x: ArrayLike, y: ArrayLike, y_err: ArrayLike, label: Optional[str] = None, color: Optional[str] = None, ax: Optional[plt.Axes] = None) -> None:
     """
