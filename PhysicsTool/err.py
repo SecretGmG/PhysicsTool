@@ -3,7 +3,7 @@ import pandas as pd
 import sympy
 from numpy.typing import ArrayLike
 from sympy import Symbol, Expr, Function, Eq
-from typing import Optional, Dict, List, TextIO, Self
+from typing import Iterable, Optional, Dict, List, TextIO, Self
 
 class Err:
     '''
@@ -36,13 +36,8 @@ class Err:
             err = mean.err
             mean = mean.mean
         
-        mean = np.asarray(mean)
         if err is None:
-            if isinstance(mean.ravel()[0],Err):
-                err = np.vectorize(lambda e: e.err)(mean)
-                mean = np.vectorize(lambda e: e.mean)(mean)
-            else:
-                err = np.zeros_like(mean)
+            err = np.zeros_like(mean)
         
         mean, err = np.broadcast_arrays(mean, err)
         
@@ -85,6 +80,20 @@ class Err:
         err = df['error'].values
         return cls(mean, err, format = format)
 
+    @classmethod
+    def collect(cls, errs : Iterable[Self]) -> Self:
+        '''
+        Collects multiple Err objects into a single Err object by combining them.
+
+        Parameters:
+            errs (Iterable[Err]): An iterable of Err objects to combine.
+
+        Returns:
+            Err: A single Err object with combined mean and error values.
+        '''
+        mean = np.array([err.mean for err in errs])
+        err = np.array([err.err for err in errs])
+        return Err(mean, err, format = errs[0].format)
 
     def apply(self, foo: Function | Expr) -> Self:
         '''

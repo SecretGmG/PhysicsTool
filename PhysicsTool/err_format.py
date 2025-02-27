@@ -118,7 +118,6 @@ class ErrFormat:
 
             exponents[i] = mean_exponent
 
-        formatted_errs[err.err == 0] = '0'
         return (
             formatted_means.reshape(err.mean.shape),
             formatted_errs.reshape(err.err.shape),
