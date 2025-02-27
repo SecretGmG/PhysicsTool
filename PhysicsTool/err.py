@@ -91,8 +91,12 @@ class Err:
         Returns:
             Err: A single Err object with combined mean and error values.
         '''
-        mean = np.array([err.mean for err in errs])
+        
+        mean = np.array([err.mean for err in errs]) 
         err = np.array([err.err for err in errs])
+        #remove the dimensions of size 1
+        mean = np.squeeze(mean)
+        err = np.squeeze(err)
         return Err(mean, err, format = errs[0].format)
 
     def apply(self, foo: Function | Expr) -> Self:
