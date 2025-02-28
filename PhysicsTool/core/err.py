@@ -35,19 +35,25 @@ class Err:
             from PhysicsTool.core.err_format import SCI_FORMAT
             format = SCI_FORMAT
         
+        self.format = format
+        
         if isinstance(mean, Err):
             err = mean.err
             mean = mean.mean
+
+        mean = np.array(mean)
         
         if err is None:
             err = np.zeros_like(mean)
         
+        err = np.array(err)
+        
         mean, err = np.broadcast_arrays(mean, err)
         
-        self.mean = np.atleast_1d(np.array(mean)).astype(np.float64)
-        self.err = np.atleast_1d(np.array(err)).astype(np.float64)
+        self.mean = np.atleast_1d(mean).astype(np.float64)
+        self.err = np.atleast_1d(err).astype(np.float64)
         
-        self.format = format
+        
 
     @classmethod
     def from_data(cls, data: ArrayLike, axis: Optional[int] = None, format = None) -> Self:
@@ -104,6 +110,7 @@ class Err:
         mean_result = sympy.lambdify(x, foo)(self.mean)
         err_result = sympy.lambdify(x, sympy.Abs(sympy.diff(foo, x)))(self.mean) * self.err
         return Err(mean_result, err_result, self.format)
+    
     def bounds(self) -> tuple[np.ndarray, np.ndarray]:
         '''
         Returns the upper and lower bounds for each measurement.
@@ -114,6 +121,7 @@ class Err:
         lower_bound = self.mean - self.err
         upper_bound = self.mean + self.err
         return lower_bound, upper_bound
+
     def approx_eq(self, other: ArrayLike | Self, tolerance = 1.0) -> bool:
         '''
         Checks if the current values are approximately equal to another Err or array-like value.
@@ -184,7 +192,7 @@ class Err:
         '''
         return r'\\'.join(np.ravel(self.format.latex_array(self, delimiter)))
 
-    def toString(self) -> str:
+    def __str__(self) -> str:
         '''
         Generates a string representation of the error and mean values with customizable formatting.
         
@@ -197,7 +205,7 @@ class Err:
         '''
         String representation of the Err object, showing its contents as formatted strings.
         '''
-        return self.toString()
+        return self.__str__()
     def _repr_latex_(self):
         '''
         Pretty LaTeX representation for Jupyter notebooks, using LaTeX formatting.
@@ -224,6 +232,21 @@ class Err:
         # Flatten along the first dimension and iterate over that
         for i in range(self.mean.shape[0]):
             yield self[i]  # Return an Err object for each "row" or slice
+        
+
+    def __eq__(self, other):
+        '''
+        Checks if two Err objects are equal by comparing both mean and error arrays.
+
+        Parameters:
+            other (Err | ArrayLike): The object to compare against.
+
+        Returns:
+            bool: True if both mean and error values match, False otherwise.
+        '''
+        if isinstance(other, Err):
+            return np.array_equal(self.mean, other.mean) and np.array_equal(self.err, other.err)
+        return False  # Err objects are not equal to non-Err types
 
     def flatten(self):
         '''
@@ -231,6 +254,10 @@ class Err:
         This is useful for handling multi-dimensional cases.
         '''
         return Err(self.mean.flatten(), self.err.flatten())
+    
+    
+    
+    __array_priority__ = 1000  # Ensures Err takes precedence over NumPy arrays
     
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         '''
@@ -245,17 +272,14 @@ class Err:
         Returns:
             Err: The resulting Err object after applying the ufunc.
         '''
-            
-            
+        
         assert method == '__call__', 'Only __call__ method is supported'
+        assert len(inputs) == 1, 'Only unary operations are supported'
+        assert len(kwargs) == 0, 'No additional arguments are supported'
         
-        try:
-            sympy_ufunc = getattr(sympy, ufunc.__name__)
-        except AttributeError:
-            return NotImplemented
-        
+        sympy_ufunc = getattr(sympy, ufunc.__name__)
+        assert type(sympy_ufunc) is sympy.FunctionClass, f'No equivalent sympy function for {ufunc.__name__}'
         out = self.apply(sympy_ufunc)
-        
         return out
         
     def __add__(self, other):
@@ -279,6 +303,12 @@ class Err:
     def __pow__(self, other):
         a, b = sympy.symbols('a,b')
         out = calc_err(a**b, {a: self, b: other})
+        out.format = _combine_format(self, other)
+        return out
+    
+    def __rpow__(self, other):
+        a, b = sympy.symbols('a,b')
+        out = calc_err(b**a, {a: self, b: other})
         out.format = _combine_format(self, other)
         return out
 
@@ -317,25 +347,8 @@ class Err:
         out.format = _combine_format(self, other)
         return out
 
-def from_data(data: ArrayLike, axis: Optional[int] = None, format = None) -> Err:
-    '''
-    Creates an Err instance from raw data by calculating the mean and standard error.
-
-    Parameters:
-        data (ArrayLike): Input data from which the mean and standard error will be calculated.
-        axis (Optional[int]): The axis along which to calculate. If None, the entire data is used.
-
-    Returns:
-        Err: An Err object with calculated mean and standard error.
-    '''
-    return Err.from_data(data, axis, format)
-
-
-def concatenate(errors: Iterable[Err], axis = 0) -> Err:
-    '''
-    Concatenates an Iterable of Err objects into a single Err object by combining them.
-    '''
-    return Err.concatenate(errors, axis=axis)
+from_data = Err.from_data
+concatenate = Err.concatenate
 
 def _combine_format(a, b):
     if isinstance(a, Err) and isinstance(b, Err):
