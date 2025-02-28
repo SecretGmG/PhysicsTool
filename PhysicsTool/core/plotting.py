@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 def start_plt(title: str = '', xlabel: str = 'x', ylabel: str = 'y', grid: bool = True, ax=None, 
               fontsize: int = 13, labelsize: int = 12, ticksize: int = 11) -> None:
-    """
+    '''
     Set up the title, xlabel, ylabel, and grid for the matplotlib plot.
     
     Parameters:
@@ -23,7 +23,7 @@ def start_plt(title: str = '', xlabel: str = 'x', ylabel: str = 'y', grid: bool 
     
     Returns:
         None
-    """
+    '''
     if ax is None:
         ax = plt.gca()
     if title:
@@ -38,7 +38,7 @@ def start_plt(title: str = '', xlabel: str = 'x', ylabel: str = 'y', grid: bool 
     ax.grid(grid)
 
 def end_plt(legend_loc: str = 'best', legend_fontsize: int = 12, ax=None) -> None:
-    """
+    '''
     Finalize the matplotlib plot settings, display the legend
     
     Parameters:
@@ -48,7 +48,7 @@ def end_plt(legend_loc: str = 'best', legend_fontsize: int = 12, ax=None) -> Non
     
     Returns:
         None
-    """
+    '''
     if ax is None:
         ax = plt.gca()
 
@@ -57,7 +57,7 @@ def end_plt(legend_loc: str = 'best', legend_fontsize: int = 12, ax=None) -> Non
         ax.legend(loc=legend_loc, fontsize=legend_fontsize)
 
 def err_band_plot(x: ArrayLike, y: ArrayLike, y_err: ArrayLike, label: Optional[str] = None, color: Optional[str] = None, ax: Optional[plt.Axes] = None) -> None:
-    """
+    '''
     Plots the function defined by x, y, and additionally the shaded error band according to y_err.
 
     Parameters:
@@ -70,7 +70,7 @@ def err_band_plot(x: ArrayLike, y: ArrayLike, y_err: ArrayLike, label: Optional[
 
     Returns:
         None
-    """
+    '''
     # Initialize ax to current axes if not provided
     if ax is None:
         ax = plt.gca()

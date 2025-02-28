@@ -5,6 +5,9 @@ from numpy.typing import ArrayLike
 from sympy import Symbol, Expr, Function, Eq
 from typing import Iterable, Optional, Dict, List, TextIO, Self
 
+
+
+
 class Err:
     '''
     A class to handle measurements and their associated errors, providing various methods
@@ -29,7 +32,7 @@ class Err:
                 Err instances.
         '''
         if format is None:
-            from PhysicsTool.err_format import SCI_FORMAT
+            from PhysicsTool.core.err_format import SCI_FORMAT
             format = SCI_FORMAT
         
         if isinstance(mean, Err):
@@ -63,40 +66,21 @@ class Err:
         return cls(mean, std_err, format = format)
 
     @classmethod
-    def from_dataframe(cls, df: pd.DataFrame, format = None) -> Self:
-        """
-        Creates an Err instance from a pandas DataFrame with 'mean' and 'error' columns.
-
-        Parameters:
-            df (pd.DataFrame): DataFrame containing 'mean' and 'error' columns.
-
-        Returns:
-            Err: An Err object with calculated mean and error.
-        """
-        if 'mean' not in df or 'error' not in df:
-            raise ValueError("DataFrame must contain 'mean' and 'error' columns.")
-        
-        mean = df['mean'].values
-        err = df['error'].values
-        return cls(mean, err, format = format)
-
-    @classmethod
-    def collect(cls, errs : Iterable[Self]) -> Self:
+    def concatenate(cls, errs : Iterable[Self], axis = 0) -> Self:
         '''
-        Collects multiple Err objects into a single Err object by combining them.
-
+        Concatenates an Iterable of Err objects into a single Err object by combining them.
+        
         Parameters:
-            errs (Iterable[Err]): An iterable of Err objects to combine.
-
+            errs (Iterable[Err]): The Err objects to concatenate.
+            axis (int): The axis along which to concatenate the Err objects.
+            
         Returns:
-            Err: A single Err object with combined mean and error values.
+            Err: The resulting Err object after concatenation.
+        
         '''
         
-        mean = np.array([err.mean for err in errs]) 
-        err = np.array([err.err for err in errs])
-        #remove the dimensions of size 1
-        mean = np.squeeze(mean)
-        err = np.squeeze(err)
+        mean = np.concatenate([err.mean for err in errs], axis=axis)
+        err = np.concatenate([err.err for err in errs], axis=axis)
         return Err(mean, err, format = errs[0].format)
 
     def apply(self, foo: Function | Expr) -> Self:
@@ -121,12 +105,12 @@ class Err:
         err_result = sympy.lambdify(x, sympy.Abs(sympy.diff(foo, x)))(self.mean) * self.err
         return Err(mean_result, err_result, self.format)
     def bounds(self) -> tuple[np.ndarray, np.ndarray]:
-        """
+        '''
         Returns the upper and lower bounds for each measurement.
 
         Returns:
             tuple: A tuple (lower_bound, upper_bound), where both elements are numpy arrays.
-        """
+        '''
         lower_bound = self.mean - self.err
         upper_bound = self.mean + self.err
         return lower_bound, upper_bound
@@ -224,30 +208,56 @@ class Err:
         return Err(self.mean[indices], self.err[indices], format=self.format)
     
     def __len__(self):
-        """
+        '''
         Return the length of the first dimension of the Err object.
         If the array is multi-dimensional, this returns the size of the first axis.
-        """
+        '''
         return self.mean.shape[0]
 
     def __iter__(self):
-        """
+        '''
         Allows the Err object to be treated as an iterable (iterating over its elements).
         This makes it compatible with pandas when assigned to a DataFrame column.
         If the Err object is multi-dimensional, this flattens the object, yielding
         Err objects for each element.
-        """
+        '''
         # Flatten along the first dimension and iterate over that
         for i in range(self.mean.shape[0]):
             yield self[i]  # Return an Err object for each "row" or slice
 
     def flatten(self):
-        """
+        '''
         Flattens the Err object into 1D. Returns an Err object where mean and err are 1D arrays.
         This is useful for handling multi-dimensional cases.
-        """
+        '''
         return Err(self.mean.flatten(), self.err.flatten())
     
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        '''
+        Implements the array ufunc protocol for Err objects, allowing for element-wise operations.
+        
+        Parameters:
+            ufunc (numpy.ufunc): The numpy universal function to apply.
+            method (str): The method to apply, typically '__call__'.
+            inputs (Tuple): The input values to apply the ufunc to.
+            kwargs (Dict): Additional keyword arguments.
+            
+        Returns:
+            Err: The resulting Err object after applying the ufunc.
+        '''
+            
+            
+        assert method == '__call__', 'Only __call__ method is supported'
+        
+        try:
+            sympy_ufunc = getattr(sympy, ufunc.__name__)
+        except AttributeError:
+            return NotImplemented
+        
+        out = self.apply(sympy_ufunc)
+        
+        return out
+        
     def __add__(self, other):
         a, b = sympy.symbols('a,b')
         out = calc_err(a+b, {a: self, b: other})
@@ -307,6 +317,25 @@ class Err:
         out.format = _combine_format(self, other)
         return out
 
+def from_data(data: ArrayLike, axis: Optional[int] = None, format = None) -> Err:
+    '''
+    Creates an Err instance from raw data by calculating the mean and standard error.
+
+    Parameters:
+        data (ArrayLike): Input data from which the mean and standard error will be calculated.
+        axis (Optional[int]): The axis along which to calculate. If None, the entire data is used.
+
+    Returns:
+        Err: An Err object with calculated mean and standard error.
+    '''
+    return Err.from_data(data, axis, format)
+
+
+def concatenate(errors: Iterable[Err], axis = 0) -> Err:
+    '''
+    Concatenates an Iterable of Err objects into a single Err object by combining them.
+    '''
+    return Err.concatenate(errors, axis=axis)
 
 def _combine_format(a, b):
     if isinstance(a, Err) and isinstance(b, Err):
@@ -438,7 +467,8 @@ def calc_err(expr: sympy.Expr,
     
     missing_symbols = [symbol for symbol in expr.free_symbols if symbol not in values]
     if missing_symbols:
-        raise ValueError(f"Missing value for required symbols: {', '.join([f"'{s}'" for s in missing_symbols])}")
+        missing_symbols_string = ', '.join([str(s) for s in missing_symbols])
+        raise ValueError(f'Missing value for required symbols: {missing_symbols_string}')
     
     #cast all values to errors
     for key, val in values.items():

@@ -1,12 +1,12 @@
 from typing import Self, Tuple
 import numpy as np
-from PhysicsTool.err import Err
+from PhysicsTool.core.err import Err
 
 
 class ErrFormat:
-    """
+    '''
     A class for formatting error values and their means with specified precision and format settings.
-    """
+    '''
     err_sigfigs: int
     val_sigfigs: int
     relative: bool
@@ -14,8 +14,15 @@ class ErrFormat:
     min_positive_exponent: int
     max_negative_exponent: int
 
-    def __init__(self, err_sigfigs: int, val_sigfigs: int, relative: bool, exponent_factor: int, min_positive_exponent: int, max_negative_exponent: int) -> None:
-        """
+    def __init__(self, 
+                 err_sigfigs: int = 2, 
+                 val_sigfigs: int = 5, 
+                 relative: bool = False, 
+                 exponent_factor: int = 1,
+                 min_positive_exponent: int = 3, 
+                 max_negative_exponent: int = -3
+                 ) -> None:
+        '''
         Initialize the ErrFormat with settings for error precision, mean precision, relative error formatting, 
         and exponent factor.
 
@@ -26,13 +33,13 @@ class ErrFormat:
             exponent_factor (int): The factor used to determine exponent rounding, must be >= 0.
             min_positive_exponent (int): Minimum positive exponent for scientific notation.
             max_negative_exponent (int): Maximum negative exponent for scientific notation.
-        """
+        '''
         if not all(isinstance(arg, int) and arg > 0 for arg in [err_sigfigs, val_sigfigs]):
-            raise ValueError("err_sigfigs and val_sigfigs must be positive integers.")
+            raise ValueError('err_sigfigs and val_sigfigs must be positive integers.')
         if not isinstance(relative, bool):
-            raise ValueError("relative must be a boolean value.")
+            raise ValueError('relative must be a boolean value.')
         if not isinstance(exponent_factor, int) or exponent_factor < 0:
-            raise ValueError("exponent_factor must be a non-negative integer.")
+            raise ValueError('exponent_factor must be a non-negative integer.')
         
         self.err_sigfigs = err_sigfigs
         self.val_sigfigs = val_sigfigs
@@ -42,7 +49,7 @@ class ErrFormat:
         self.max_negative_exponent = max_negative_exponent
 
     def combine(self, other: Self) -> Self:
-        """
+        '''
         Combine this ErrFormat with another ErrFormat, taking the minimum of each setting.
 
         Args:
@@ -50,7 +57,7 @@ class ErrFormat:
 
         Returns:
             ErrFormat: A new ErrFormat instance with combined settings.
-        """
+        '''
         return ErrFormat(
             min(self.err_sigfigs, other.err_sigfigs),
             min(self.val_sigfigs, other.val_sigfigs),
@@ -61,7 +68,7 @@ class ErrFormat:
         )
 
     def _calculate_exponent(self, val: float, error: float) -> int:
-        """Calculate the exponent based on value and error and the current exponent factor."""
+        '''Calculate the exponent based on value and error and the current exponent factor.'''
         if self.exponent_factor <= 0 or (val == 0 and error == 0):
             return 0
         relevant_value = val if val != 0 else error
@@ -74,14 +81,14 @@ class ErrFormat:
             
 
     def _calculate_precision(self, error: float, mean_exponent: int) -> int:
-        """Calculate the precision based on error, error sigfigs, and mean exponent."""
+        '''Calculate the precision based on error, error sigfigs, and mean exponent.'''
         if error != 0:
             error_exponent = int(np.floor(np.log10(abs(error))))
             return self.err_sigfigs - error_exponent - 1
         return self.val_sigfigs - mean_exponent - 1
 
     def _format(self, err: Err) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
+        '''
         Format the means and errors in the given Err object according to the ErrFormat settings.
 
         Args:
@@ -89,7 +96,7 @@ class ErrFormat:
 
         Returns:
             Tuple[np.ndarray, np.ndarray, np.ndarray]: Arrays of formatted mean values, errors, and exponents.
-        """
+        '''
         mean_flat, err_flat = np.ravel(err.mean), np.ravel(err.err)
         
         formatted_means = np.empty_like(mean_flat, dtype=object)
@@ -125,7 +132,7 @@ class ErrFormat:
         )
 
     def latex_array(self, err: Err, delimiter: str = '$') -> np.ndarray:
-        """
+        '''
         Format the means and errors in the Err object as LaTeX strings.
 
         Args:
@@ -134,13 +141,14 @@ class ErrFormat:
 
         Returns:
             np.ndarray: An array of formatted strings in LaTeX format.
-        """
+        '''
         
         def format_to_latex(m, e, exp):
+            percentage = r'\%' if self.relative else ''
             if exp != 0:
-                return rf'{delimiter}({m} \pm {e}{r"\%" if self.relative else ""}) \times 10^{{{exp}}}{delimiter}'
+                return rf'{delimiter}({m} \pm {e}{percentage}) \times 10^{{{exp}}}{delimiter}'
             else:
-                return rf'{delimiter}{m} \pm {e}{delimiter}{r"\%" if self.relative else ""}'
+                return rf'{delimiter}{m} \pm {e}{delimiter}{percentage}'
         
         
         formatted_mean, formatted_err, exponents = self._format(err)
@@ -149,7 +157,7 @@ class ErrFormat:
         return latex_strings
 
     def string_array(self, err: Err) -> np.ndarray:
-        """
+        '''
         Format the means and errors in the Err object as plain text strings.
 
         Args:
@@ -157,12 +165,13 @@ class ErrFormat:
 
         Returns:
             np.ndarray: An array of formatted strings in plain text format.
-        """
+        '''
         def format_to_string(m, e, exp):
+            percentage = '%' if self.relative else ''
             if exp != 0:
-                return f'({m} ± {e}{"%" if self.relative else ""}) × 10^{exp}'
+                return f'({m} ± {e}{percentage}) × 10^{exp}'
             else:
-                return f'{m} ± {e}{"%" if self.relative else ""}'
+                return f'{m} ± {e}{percentage}'
         
         formatted_mean, formatted_err, exponents = self._format(err)
         strings = np.vectorize(format_to_string)(formatted_mean, formatted_err, exponents)

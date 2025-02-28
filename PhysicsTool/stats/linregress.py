@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Literal, Tuple
-from .err import Err
+from PhysicsTool.core.err import Err
 
 
 def linear_linregress(x_values: np.ndarray, y_data: Err, error_calculation: Literal['script', 'residuals', 'covariance']) -> Tuple[Err, Err, float, float]:
