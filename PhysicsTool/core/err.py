@@ -18,10 +18,7 @@ class Err:
         err (np.ndarray): The errors associated with the measurements.
     '''
     
-    relative : bool
-    
-    
-    def __init__(self, mean: ArrayLike, err : ArrayLike = None, format = None):
+    def __init__(self, mean: ArrayLike, err : ArrayLike = None, format = None, relative = False):
         '''
         Initializes an Err object with mean values and associated errors.
 
@@ -47,6 +44,9 @@ class Err:
             err = np.zeros_like(mean)
         
         err = np.array(err)
+        
+        if relative:
+            err = mean * err
         
         mean, err = np.broadcast_arrays(mean, err)
         
@@ -99,12 +99,12 @@ class Err:
         Returns:
             Err: The resulting Err object after applying the function.
         '''
-        x = Symbol('x')
+        x = sympy.Symbol('x')
         if isinstance(foo, sympy.FunctionClass):
             foo = foo(x)
         else:
             free_symbols = foo.free_symbols
-            assert len(free_symbols) == 1, 'Cannot apply function with more than one argument. Use calc_err to compute such expressions.'
+            assert len(free_symbols) == 1, 'Function must have exactly one free symbol. Use calc_err for multi-variable expressions.'
             x = list(free_symbols)[0]
         
         mean_result = sympy.lambdify(x, foo)(self.mean)
@@ -274,12 +274,19 @@ class Err:
         '''
         
         assert method == '__call__', 'Only __call__ method is supported'
-        assert len(inputs) == 1, 'Only unary operations are supported'
-        assert len(kwargs) == 0, 'No additional arguments are supported'
         
-        sympy_ufunc = getattr(sympy, ufunc.__name__)
-        assert type(sympy_ufunc) is sympy.FunctionClass, f'No equivalent sympy function for {ufunc.__name__}'
-        out = self.apply(sympy_ufunc)
+        sympy_func_name = ufunc.__name__.replace('arc', 'a')
+        if not hasattr(sympy, sympy_func_name):
+            raise AttributeError(f'No equivalent sympy function for {ufunc.__name__}')
+        
+        sympy_ufunc = getattr(sympy, sympy_func_name)
+        
+        assert isinstance(sympy_ufunc, sympy.FunctionClass), f'No equivalent sympy function for {ufunc.__name__}'
+        
+        nr_symbols = sympy.numbered_symbols()
+        symbols = [next(nr_symbols) for _ in range(len(inputs)+len(kwargs))]
+        out = calc_err(sympy_ufunc(*symbols), dict(zip(symbols, inputs)))
+        
         return out
         
     def __add__(self, other):
