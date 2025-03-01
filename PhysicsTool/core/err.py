@@ -1,11 +1,7 @@
 import numpy as np
-import pandas as pd
 import sympy
 from numpy.typing import ArrayLike
-from sympy import Symbol, Expr, Function, Eq
 from typing import Iterable, Optional, Dict, List, TextIO, Self
-
-
 
 
 class Err:
@@ -18,7 +14,10 @@ class Err:
         err (np.ndarray): The errors associated with the measurements.
     '''
     
-    def __init__(self, mean: ArrayLike, err : ArrayLike = None, format = None, relative = False):
+    # Ensures Err takes precedence over NumPy arrays, leading to the correct ufunc behavior
+    __array_priority__ = 1000
+
+    def __init__(self, mean: ArrayLike, err : ArrayLike = None, format : 'ErrFormat' = None, relative = False): # type: ignore
         '''
         Initializes an Err object with mean values and associated errors.
 
@@ -29,8 +28,11 @@ class Err:
                 Err instances.
         '''
         if format is None:
-            from PhysicsTool.core.err_format import SCI_FORMAT
-            format = SCI_FORMAT
+            from PhysicsTool.core.err_format import SCI_FORMAT, SCI_FORMAT_REL
+            if relative:
+                format = SCI_FORMAT_REL
+            else:
+                format = SCI_FORMAT
         
         self.format = format
         
@@ -56,7 +58,7 @@ class Err:
         
 
     @classmethod
-    def from_data(cls, data: ArrayLike, axis: Optional[int] = None, format = None) -> Self:
+    def from_data(cls, data: ArrayLike, axis: Optional[int] = None, format: Optional['ErrFormat'] = None) -> Self: # type: ignore
         '''
         Creates an Err instance from raw data by calculating the mean and standard error.
 
@@ -89,7 +91,9 @@ class Err:
         err = np.concatenate([err.err for err in errs], axis=axis)
         return Err(mean, err, format = errs[0].format)
 
-    def apply(self, foo: Function | Expr) -> Self:
+    from typing import Union
+
+    def apply(self, foo: Union[sympy.Function, sympy.Expr]) -> Self:
         '''
         Applies a sympy function or expression to the current mean and error values.
 
@@ -99,7 +103,7 @@ class Err:
         Returns:
             Err: The resulting Err object after applying the function.
         '''
-        x = sympy.Symbol('x')
+        x = sympy.Dummy('x')
         if isinstance(foo, sympy.FunctionClass):
             foo = foo(x)
         else:
@@ -121,8 +125,8 @@ class Err:
         lower_bound = self.mean - self.err
         upper_bound = self.mean + self.err
         return lower_bound, upper_bound
-
-    def approx_eq(self, other: ArrayLike | Self, tolerance = 1.0) -> bool:
+    
+    def approx_eq(self, other: ArrayLike | Self, tolerance: float = 1.0) -> bool:
         '''
         Checks if the current values are approximately equal to another Err or array-like value.
 
@@ -150,7 +154,7 @@ class Err:
         '''
         return np.allclose(self.mean, other.mean) and np.allclose(self.err, other.err)
 
-    def average(self, axis=None) -> Self:
+    def average(self, axis: Optional[int] = None) -> Self:
         '''
         Computes the average and propagates the error along a specified axis.
 
@@ -164,7 +168,7 @@ class Err:
         err_avg = np.sqrt(np.sum(self.err ** 2, axis=axis)) / np.size(self.err, axis=axis)
         return Err(mean_avg, err_avg, format = self.format)
 
-    def weighted_average(self, axis=None) -> Self:
+    def weighted_average(self, axis: Optional[int] = None) -> Self:
         '''
         Computes the weighted average and its associated error, following standard error propagation rules.
 
@@ -179,8 +183,7 @@ class Err:
         # source: https://www.physics.umd.edu/courses/Phys261/F06/ErrorPropagation.pdf
         err_weighted_avg = np.sqrt(1 / np.sum(weights, axis=axis))
         return Err(mean_weighted_avg, err_weighted_avg, format = self.format)
-    def latex(self, delimiter: str = '$'
-              ) -> str:
+    def latex(self, delimiter: str = '$') -> str:
         '''
         Generates a LaTeX string for the error and mean values with customizable formatting.
 
@@ -255,9 +258,7 @@ class Err:
         '''
         return Err(self.mean.flatten(), self.err.flatten())
     
-    
-    
-    __array_priority__ = 1000  # Ensures Err takes precedence over NumPy arrays
+    # Ensures Err takes precedence over NumPy arrays, leading to the correct ufunc behavior
     
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         '''
@@ -276,11 +277,9 @@ class Err:
         assert method == '__call__', 'Only __call__ method is supported'
         
         sympy_func_name = ufunc.__name__.replace('arc', 'a')
-        if not hasattr(sympy, sympy_func_name):
-            raise AttributeError(f'No equivalent sympy function for {ufunc.__name__}')
         
+        assert hasattr(sympy, sympy_func_name),f'No equivalent sympy function for {ufunc.__name__}'
         sympy_ufunc = getattr(sympy, sympy_func_name)
-        
         assert isinstance(sympy_ufunc, sympy.FunctionClass), f'No equivalent sympy function for {ufunc.__name__}'
         
         nr_symbols = sympy.numbered_symbols()
@@ -310,12 +309,6 @@ class Err:
     def __pow__(self, other):
         a, b = sympy.symbols('a,b')
         out = calc_err(a**b, {a: self, b: other})
-        out.format = _combine_format(self, other)
-        return out
-    
-    def __rpow__(self, other):
-        a, b = sympy.symbols('a,b')
-        out = calc_err(b**a, {a: self, b: other})
         out.format = _combine_format(self, other)
         return out
 
@@ -368,14 +361,14 @@ def _combine_format(a, b):
     return SCI_FORMAT
 
 def derive_err(
-    expr: Expr,
-    values: Optional[List[Symbol]] = None,
-    target_symbol: Symbol = Symbol('f'),
+    expr: sympy.Expr,
+    values: Optional[List[sympy.Symbol]] = None,
+    target_symbol: sympy.Symbol = sympy.Symbol('f'),
     err_prefix: str = 's',
     relative: bool = False,
     do_display: bool = False,
     tex: Optional[TextIO] = None
-) -> Expr:
+) -> sympy.Expr:
     '''
     Derives the absolute or relative Gaussian error from an expression, based on propagation rules.
 
@@ -417,7 +410,7 @@ def derive_err(
 
     from .logging import log
 
-    target_err_symbol = Symbol(f'{err_prefix}_{target_symbol}')
+    target_err_symbol = sympy.Symbol(f'{err_prefix}_{target_symbol}')
         
     target_err_symbol_squared = target_err_symbol ** 2
 
@@ -427,7 +420,7 @@ def derive_err(
         free_args = list(expr.free_symbols)
 
     
-    target_function = Function(target_symbol)(*free_args)
+    target_function = sympy.Function(target_symbol)(*free_args)
     temp_err_squared_expr = sympy.S.Zero
     temp_exprs, diff_exprs, diff_res_exprs = [], [], []
 
@@ -450,18 +443,18 @@ def derive_err(
     diff_err_squared_expr = temp_err_squared_expr.subs(
         list(zip(temp_exprs, diff_exprs)), evaluate=False)
     
-    log(Eq(target_err_symbol_squared, diff_err_squared_expr,
+    log(sympy.Eq(target_err_symbol_squared, diff_err_squared_expr,
             evaluate=False), do_display, tex)
         
     with sympy.evaluate(False):
         err_squared_expr = temp_err_squared_expr.subs(
             zip(temp_exprs, diff_res_exprs))
         
-        log(Eq(target_err_symbol_squared, err_squared_expr), do_display, tex)
+        log(sympy.Eq(target_err_symbol_squared, err_squared_expr), do_display, tex)
             
     err_expr = sympy.sqrt(err_squared_expr)
     
-    log(Eq(target_err_symbol, err_expr, evaluate=False), do_display, tex)
+    log(sympy.Eq(target_err_symbol, err_expr, evaluate=False), do_display, tex)
     
     return err_expr
 
@@ -496,7 +489,7 @@ def calc_err(expr: sympy.Expr,
             
     for key, val in values.items():
         mean_values[key] = val.mean
-        err_values[Symbol(f'{err_prefix}_{key}')] = val.err
+        err_values[sympy.Symbol(f'{err_prefix}_{key}')] = val.err
 
     all_values = mean_values | err_values
     
