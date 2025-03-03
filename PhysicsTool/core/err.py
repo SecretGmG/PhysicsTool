@@ -17,7 +17,7 @@ class Err:
     # Ensures Err takes precedence over NumPy arrays, leading to the correct ufunc behavior
     __array_priority__ = 1000
 
-    def __init__(self, mean: ArrayLike, err : ArrayLike = None, format : 'ErrFormat' = None, relative = False): # type: ignore
+    def __init__(self, mean: ArrayLike, err : Optional[ArrayLike] = None, format : Optional['ErrFormat'] = None, relative = False): # type: ignore
         '''
         Initializes an Err object with mean values and associated errors.
 
@@ -69,8 +69,8 @@ class Err:
         Returns:
             Err: An Err object with calculated mean and standard error.
         '''
-        mean = np.mean(data, axis)
-        std_err = np.std(data, axis, ddof=1) / np.sqrt(np.size(data, axis))
+        mean = np.nanmean(data, axis)
+        std_err = np.nanstd(data, axis, ddof=1) / np.sqrt(np.count_nonzero(~np.isnan(data), axis))
         return cls(mean, std_err, format = format)
 
     @classmethod
@@ -93,28 +93,6 @@ class Err:
 
     from typing import Union
 
-    def apply(self, foo: Union[sympy.Function, sympy.Expr]) -> Self:
-        '''
-        Applies a sympy function or expression to the current mean and error values.
-
-        Parameters:
-            foo (Function | Expr): The sympy function or expression to apply.
-
-        Returns:
-            Err: The resulting Err object after applying the function.
-        '''
-        x = sympy.Dummy('x')
-        if isinstance(foo, sympy.FunctionClass):
-            foo = foo(x)
-        else:
-            free_symbols = foo.free_symbols
-            assert len(free_symbols) == 1, 'Function must have exactly one free symbol. Use calc_err for multi-variable expressions.'
-            x = list(free_symbols)[0]
-        
-        mean_result = sympy.lambdify(x, foo)(self.mean)
-        err_result = sympy.lambdify(x, sympy.Abs(sympy.diff(foo, x)))(self.mean) * self.err
-        return Err(mean_result, err_result, self.format)
-    
     def bounds(self) -> tuple[np.ndarray, np.ndarray]:
         '''
         Returns the upper and lower bounds for each measurement.
@@ -284,10 +262,18 @@ class Err:
         
         nr_symbols = sympy.numbered_symbols()
         symbols = [next(nr_symbols) for _ in range(len(inputs)+len(kwargs))]
-        out = calc_err(sympy_ufunc(*symbols), dict(zip(symbols, inputs)))
-        
+        try:
+            out = calc_err(sympy_ufunc(*symbols), dict(zip(symbols, inputs)))
+        except:
+            raise ValueError(f'Error in applying {ufunc.__name__} to Err objects')        
         return out
-        
+    
+    def __neg__(self):
+        return Err(-self.mean, self.err, format=self.format)
+
+    def __abs__(self):
+        return Err(np.abs(self.mean), self.err, format=self.format)
+    
     def __add__(self, other):
         a, b = sympy.symbols('a,b')
         out = calc_err(a+b, {a: self, b: other})
@@ -478,18 +464,13 @@ def calc_err(expr: sympy.Expr,
     mean_values = {}
     err_values = {}
     
-    missing_symbols = [symbol for symbol in expr.free_symbols if symbol not in values]
-    if missing_symbols:
-        missing_symbols_string = ', '.join([str(s) for s in missing_symbols])
-        raise ValueError(f'Missing value for required symbols: {missing_symbols_string}')
+    _check_for_missing_symbols(expr, values)
     
     #cast all values to errors
-    for key, val in values.items():
-        values[key] = Err(val)
-            
-    for key, val in values.items():
-        mean_values[key] = val.mean
-        err_values[sympy.Symbol(f'{err_prefix}_{key}')] = val.err
+    values = {key: Err(val) for key, val in values.items()}
+    
+    mean_values = {key : val.mean for key, val in values.items()}
+    err_values = {sympy.Symbol(f'{err_prefix}_{key}'): val.err for key, val in values.items()}
 
     all_values = mean_values | err_values
     
@@ -499,3 +480,9 @@ def calc_err(expr: sympy.Expr,
     err_func = sympy.lambdify(all_values.keys(), err_expr)
 
     return Err(mean_func(*all_values.values()), err_func(*all_values.values()))
+
+def _check_for_missing_symbols(expr, values):
+    missing_symbols = [symbol for symbol in expr.free_symbols if symbol not in values]
+    if missing_symbols:
+        missing_symbols_string = ', '.join([str(s) for s in missing_symbols])
+        raise ValueError(f'Missing value for required symbols: {missing_symbols_string}')
