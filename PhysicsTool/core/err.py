@@ -1,8 +1,9 @@
 import numpy as np
 import sympy
 from numpy.typing import ArrayLike
-from typing import Iterable, Optional, Dict, List, TextIO, Self
+from typing import Iterable, Optional, Dict, List, TextIO
 
+a, b = sympy.symbols('a,b')
 
 class Err:
     '''
@@ -28,7 +29,7 @@ class Err:
                 Err instances.
         '''
         if format is None:
-            from PhysicsTool.core.err_format import SCI_FORMAT, SCI_FORMAT_REL
+            from PhysicsTool.core.format import SCI_FORMAT, SCI_FORMAT_REL
             if relative:
                 format = SCI_FORMAT_REL
             else:
@@ -54,45 +55,20 @@ class Err:
         
         self.mean = np.atleast_1d(mean).astype(np.float64)
         self.err = np.atleast_1d(err).astype(np.float64)
-        
-        
-
-    @classmethod
-    def from_data(cls, data: ArrayLike, axis: Optional[int] = None, format: Optional['ErrFormat'] = None) -> Self: # type: ignore
+    
+    
+    def with_format(self, format: 'ErrFormat') -> 'Err': # type: ignore
         '''
-        Creates an Err instance from raw data by calculating the mean and standard error.
+        Returns a copy of the Err object with a new format.
 
         Parameters:
-            data (ArrayLike): Input data from which the mean and standard error will be calculated.
-            axis (Optional[int]): The axis along which to calculate. If None, the entire data is used.
+            format (ErrFormat): The new format to apply to the Err object.
 
         Returns:
-            Err: An Err object with calculated mean and standard error.
+            Err: A new Err object with the specified format.
         '''
-        mean = np.nanmean(data, axis)
-        std_err = np.nanstd(data, axis, ddof=1) / np.sqrt(np.count_nonzero(~np.isnan(data), axis))
-        return cls(mean, std_err, format = format)
-
-    @classmethod
-    def concatenate(cls, errs : Iterable[Self], axis = 0) -> Self:
-        '''
-        Concatenates an Iterable of Err objects into a single Err object by combining them.
-        
-        Parameters:
-            errs (Iterable[Err]): The Err objects to concatenate.
-            axis (int): The axis along which to concatenate the Err objects.
-            
-        Returns:
-            Err: The resulting Err object after concatenation.
-        
-        '''
-        
-        mean = np.concatenate([err.mean for err in errs], axis=axis)
-        err = np.concatenate([err.err for err in errs], axis=axis)
-        return Err(mean, err, format = errs[0].format)
-
-    from typing import Union
-
+        return Err(self.mean, self.err, format)
+    
     def bounds(self) -> tuple[np.ndarray, np.ndarray]:
         '''
         Returns the upper and lower bounds for each measurement.
@@ -104,7 +80,7 @@ class Err:
         upper_bound = self.mean + self.err
         return lower_bound, upper_bound
     
-    def approx_eq(self, other: ArrayLike | Self, tolerance: float = 1.0) -> bool:
+    def approx_eq(self, other: ArrayLike | 'Err', tolerance: float = 1.0) -> bool:
         '''
         Checks if the current values are approximately equal to another Err or array-like value.
 
@@ -120,7 +96,7 @@ class Err:
         else:
             return np.allclose(self.mean, other, atol=self.err*tolerance)
 
-    def allclose(self, other : Self) -> bool:
+    def allclose(self, other : 'Err') -> bool:
         '''
         Checks if both the mean and error values are close to another Err object.
 
@@ -132,7 +108,7 @@ class Err:
         '''
         return np.allclose(self.mean, other.mean) and np.allclose(self.err, other.err)
 
-    def average(self, axis: Optional[int] = None) -> Self:
+    def average(self, axis: Optional[int] = None) -> 'Err':
         '''
         Computes the average and propagates the error along a specified axis.
 
@@ -146,7 +122,7 @@ class Err:
         err_avg = np.sqrt(np.sum(self.err ** 2, axis=axis)) / np.size(self.err, axis=axis)
         return Err(mean_avg, err_avg, format = self.format)
 
-    def weighted_average(self, axis: Optional[int] = None) -> Self:
+    def weighted_average(self, axis: Optional[int] = None) -> 'Err':
         '''
         Computes the weighted average and its associated error, following standard error propagation rules.
 
@@ -161,6 +137,7 @@ class Err:
         # source: https://www.physics.umd.edu/courses/Phys261/F06/ErrorPropagation.pdf
         err_weighted_avg = np.sqrt(1 / np.sum(weights, axis=axis))
         return Err(mean_weighted_avg, err_weighted_avg, format = self.format)
+
     def latex(self, delimiter: str = '$') -> str:
         '''
         Generates a LaTeX string for the error and mean values with customizable formatting.
@@ -173,6 +150,13 @@ class Err:
         '''
         return r'\\'.join(np.ravel(self.format.latex_array(self, delimiter)))
 
+    def flatten(self):
+        '''
+        Flattens the Err object into 1D. Returns an Err object where mean and err are 1D arrays.
+        This is useful for handling multi-dimensional cases.
+        '''
+        return Err(self.mean.flatten(), self.err.flatten())
+    
     def __str__(self) -> str:
         '''
         Generates a string representation of the error and mean values with customizable formatting.
@@ -202,7 +186,7 @@ class Err:
         If the array is multi-dimensional, this returns the size of the first axis.
         '''
         return self.mean.shape[0]
-
+    
     def __iter__(self):
         '''
         Allows the Err object to be treated as an iterable (iterating over its elements).
@@ -213,30 +197,6 @@ class Err:
         # Flatten along the first dimension and iterate over that
         for i in range(self.mean.shape[0]):
             yield self[i]  # Return an Err object for each "row" or slice
-        
-
-    def __eq__(self, other):
-        '''
-        Checks if two Err objects are equal by comparing both mean and error arrays.
-
-        Parameters:
-            other (Err | ArrayLike): The object to compare against.
-
-        Returns:
-            bool: True if both mean and error values match, False otherwise.
-        '''
-        if isinstance(other, Err):
-            return np.array_equal(self.mean, other.mean) and np.array_equal(self.err, other.err)
-        return False  # Err objects are not equal to non-Err types
-
-    def flatten(self):
-        '''
-        Flattens the Err object into 1D. Returns an Err object where mean and err are 1D arrays.
-        This is useful for handling multi-dimensional cases.
-        '''
-        return Err(self.mean.flatten(), self.err.flatten())
-    
-    # Ensures Err takes precedence over NumPy arrays, leading to the correct ufunc behavior
     
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         '''
@@ -268,6 +228,20 @@ class Err:
             raise ValueError(f'Error in applying {ufunc.__name__} to Err objects')        
         return out
     
+    def __eq__(self, other):
+        if isinstance(other, Err):
+            return np.array_equal(self.mean, other.mean) and np.array_equal(self.err, other.err)
+        return False  # Err objects are not equal to non-Err types
+    
+    def __gt__(self, other):
+        return self.mean > other.mean
+    def __lt__(self, other):
+        return self.mean < other.mean
+    def __ge__(self, other):
+        return self.mean >= other.mean
+    def __le__(self, other):
+        return self.mean <= other.mean
+    
     def __neg__(self):
         return Err(-self.mean, self.err, format=self.format)
 
@@ -275,66 +249,64 @@ class Err:
         return Err(np.abs(self.mean), self.err, format=self.format)
     
     def __add__(self, other):
-        a, b = sympy.symbols('a,b')
-        out = calc_err(a+b, {a: self, b: other})
-        out.format = _combine_format(self, other)        
-        return out
+        return calc_err(a+b, {a: self, b: other}).with_format(_combine_format(self, other))
 
     def __sub__(self, other):
-        a, b = sympy.symbols('a,b')
-        out = calc_err(a-b, {a: self, b: other})
-        out.format = _combine_format(self, other)
-        return out
+        return calc_err(a-b, {a: self, b: other}).with_format(_combine_format(self, other))
 
     def __mul__(self, other):
-        a, b = sympy.symbols('a,b')
-        out = calc_err(a*b, {a: self, b: other})
-        out.format = _combine_format(self, other)
-        return out
+        return calc_err(a*b, {a: self, b: other}).with_format(_combine_format(self, other))
 
     def __pow__(self, other):
-        a, b = sympy.symbols('a,b')
-        out = calc_err(a**b, {a: self, b: other})
-        out.format = _combine_format(self, other)
-        return out
+        return calc_err(a**b, {a: self, b: other}).with_format(_combine_format(self, other))
 
     def __truediv__(self, other):
-        a, b = sympy.symbols('a,b')
-        out = calc_err(a/b, {a: self, b: other})
-        out.format = _combine_format(self, other)
-        return out
+        return calc_err(a/b, {a: self, b: other}).with_format(_combine_format(self, other))
+    
     def __radd__(self, other):
-        a, b = sympy.symbols('a,b')
-        out = calc_err(b+a, {a: self, b: other})
-        out.format = _combine_format(self, other)
-        return out
+        return calc_err(b+a, {a: self, b: other}).with_format(_combine_format(self, other))
 
     def __rsub__(self, other):
-        a, b = sympy.symbols('a,b')
-        out = calc_err(b-a, {a: self, b: other})
-        out.format = _combine_format(self, other)
-        return out
+        return calc_err(b-a, {a: self, b: other}).with_format(_combine_format(self, other))
 
     def __rmul__(self, other):
-        a, b = sympy.symbols('a,b')
-        out = calc_err(b*a, {a: self, b: other})
-        out.format = _combine_format(self, other)
-        return out
+        return calc_err(b*a, {a: self, b: other}).with_format(_combine_format(self, other))
 
     def __rpow__(self, other):
-        a, b = sympy.symbols('a,b')
-        out = calc_err(b**a, {a: self, b: other})
-        out.format = _combine_format(self, other)
-        return out
+        return calc_err(b**a, {a: self, b: other}).with_format(_combine_format(self, other))
 
     def __rtruediv__(self, other):
-        a, b = sympy.symbols('a,b')
-        out = calc_err(b/a, {a: self, b: other})
-        out.format = _combine_format(self, other)
-        return out
+        return calc_err(b/a, {a: self, b: other}).with_format(_combine_format(self, other))
 
-from_data = Err.from_data
-concatenate = Err.concatenate
+def concatenate(errs : Iterable['Err'], axis = 0) -> 'Err':
+    '''
+    Concatenates an Iterable of Err objects into a single Err object by combining them.
+    
+    Parameters:
+        errs (Iterable[Err]): The Err objects to concatenate.
+        axis (int): The axis along which to concatenate the Err objects.
+        
+    Returns:
+        Err: The resulting Err object after concatenation.
+    
+    '''
+    mean = np.concatenate([err.mean for err in errs], axis=axis)
+    err = np.concatenate([err.err for err in errs], axis=axis)
+    return Err(mean, err, format = errs[0].format)
+
+def from_data(data : ArrayLike, axis: Optional[int] = None, format: Optional['ErrFormat'] = None) -> Err: # type: ignore
+    '''
+    Creates an Err instance from raw data by calculating the mean and standard error.
+    Parameters:
+        data (ArrayLike): Input data from which the mean and standard error will be calculated.
+        axis (Optional[int]): The axis along which to calculate. If None, the entire data is used.
+    Returns:
+        Err: An Err object with calculated mean and standard error.
+    '''
+    mean = np.nanmean(data, axis)
+    std_err = np.nanstd(data, axis, ddof=1) / np.sqrt(np.count_nonzero(~np.isnan(data), axis))
+    return Err(mean, std_err, format = format)
+
 
 def _combine_format(a, b):
     if isinstance(a, Err) and isinstance(b, Err):
@@ -343,7 +315,7 @@ def _combine_format(a, b):
         return a.format
     if isinstance(b, Err):
         return b.format
-    from err_format import SCI_FORMAT
+    from PhysicsTool.core.format import SCI_FORMAT
     return SCI_FORMAT
 
 def derive_err(

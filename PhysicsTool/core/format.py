@@ -15,7 +15,7 @@ class ErrFormat:
     max_negative_exponent: int
 
     def __init__(self, 
-                 err_sigfigs: int = 2, 
+                 err_sigfigs: int = 1, 
                  val_sigfigs: int = 5, 
                  relative: bool = False, 
                  exponent_factor: int = 1,
@@ -122,6 +122,9 @@ class ErrFormat:
                 relative_error = 100 * mantissa_err / mantissa_mean
                 relative_precision = self._calculate_precision(relative_error, 0)
                 formatted_errs[i] = f'{relative_error:.{relative_precision}f}' if relative_precision > 0 else f'{int(relative_error):d}'
+            
+            if error == 0:
+                formatted_errs[i] = '0'
 
             exponents[i] = mean_exponent
 
@@ -178,8 +181,13 @@ class ErrFormat:
 
         return strings
 
+    def __str__(self):
+        return f'ErrFormat(err_sigfigs={self.err_sigfigs}, val_sigfigs={self.val_sigfigs}, relative={self.relative}, exponent_factor={self.exponent_factor}, min_positive_exponent={self.min_positive_exponent}, max_negative_exponent={self.max_negative_exponent})'
+
 # Predefined ErrFormat instances for different formatting needs.
 SCI_FORMAT = ErrFormat(1, 5, False, 1, 3, -3)
 SCI_FORMAT_REL = ErrFormat(1, 5, True, 1, 3, -3)
 ENG_FORMAT = ErrFormat(2, 5, False, 3, 3, -3)
 ENG_FORMAT_REL = ErrFormat(2, 5, True, 3, 3, -3)
+PLAIN_FORMAT = ErrFormat(2, 5, False, 0, 0, 0)
+PLAIN_FORMAT_REL = ErrFormat(2, 5, True, 0, 0, 0)

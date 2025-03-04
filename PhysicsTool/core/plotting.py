@@ -1,9 +1,6 @@
 import matplotlib.pyplot as plt
 from numpy.typing import ArrayLike
 from typing import Optional
-
-import matplotlib.pyplot as plt
-
 import matplotlib.pyplot as plt
 
 def start_plt(title: str = '', xlabel: str = 'x', ylabel: str = 'y', grid: bool = True, ax=None, 

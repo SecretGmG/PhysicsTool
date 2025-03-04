@@ -30,20 +30,33 @@ def _get_tex_df(df: pd.DataFrame, caption: str = 'Caption', label: str = 'tab:la
     return h + df.to_latex(index=False, escape=False) + t
 
 
-
-def _get_tex_sympy(expr: sympy.core.Basic) -> str:
+def _get_latex_str(expr: Union[str, sympy.Basic, pd.DataFrame, Latex]) -> str:
     '''
-    Generate LaTeX representation of a sympy expression.
+    Generate LaTeX representation of an expression.
 
     Parameters:
-        expr (sympy.core.Basic): The sympy expression to convert to LaTeX.
+        expr (Union[str, sympy.Basic, pd.DataFrame, Latex]): The expression to convert to LaTeX.
     
     Returns:
         str: The LaTeX string representing the expression.
     '''
-    if not isinstance(expr, sympy.core.Basic):
-        raise TypeError('Input must be a sympy expression.')
-    return f'\\[\n{sympy.latex(expr)}\n\\]'
+    latex_str = None
+    if isinstance(expr, sympy.Basic):
+        latex_str = f'\\[\n{sympy.latex(expr)}\n\\]'
+    elif isinstance(expr, pd.DataFrame):
+        latex_str = _get_tex_df(expr)
+    elif isinstance(expr, Latex):
+        latex_str = expr.data
+    elif isinstance(expr, str):
+        latex_str = expr
+    else:
+        try:
+            latex_str = expr._repr_latex_()
+            if isinstance(latex_str, tuple):
+                latex_str, *_ = latex_str
+        except Exception:  # Catch for missing _repr_latex_
+            latex_str = str(expr)
+    return latex_str
 
 
 def log(expr: Union[str, sympy.Basic, pd.DataFrame, Latex], do_display: bool = True, tex: Optional[TextIO] = stdout) -> None:
@@ -58,21 +71,5 @@ def log(expr: Union[str, sympy.Basic, pd.DataFrame, Latex], do_display: bool = T
     if do_display:
         display(expr)
 
-    latex_str = None
-
-    if isinstance(expr, sympy.Basic):
-        latex_str = _get_tex_sympy(expr)
-    elif isinstance(expr, pd.DataFrame):
-        latex_str = _get_tex_df(expr)
-    elif isinstance(expr, Latex):
-        latex_str = expr.data
-    else:
-        try:
-            latex_str = expr._repr_latex_()
-            if isinstance(latex_str, tuple):
-                latex_str, *_ = latex_str
-        except Exception:  # Catch for missing _repr_latex_
-            latex_str = str(expr)
-
     if tex:
-        tex.write(latex_str + '\n')
+        tex.write(_get_latex_str(expr) + '\n')
