@@ -2,7 +2,6 @@ from typing import Self, Tuple
 import numpy as np
 from PhysicsTool.core.err import Err
 
-
 class ErrFormat:
     '''
     A class for formatting error values and their means with specified precision and format settings.
@@ -20,7 +19,7 @@ class ErrFormat:
                  relative: bool = False, 
                  exponent_factor: int = 1,
                  min_positive_exponent: int = 3, 
-                 max_negative_exponent: int = -3
+                 max_negative_exponent: int = -3,
                  ) -> None:
         '''
         Initialize the ErrFormat with settings for error precision, mean precision, relative error formatting, 
@@ -87,77 +86,69 @@ class ErrFormat:
             return self.err_sigfigs - error_exponent - 1
         return self.val_sigfigs - mean_exponent - 1
 
-    def _format(self, err: Err) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        '''
-        Format the means and errors in the given Err object according to the ErrFormat settings.
+    def _format(self, mean : float, err : float) -> Tuple[str, str, str]:
 
-        Args:
-            err (Err): The Err instance containing mean and error values.
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray, np.ndarray]: Arrays of formatted mean values, errors, and exponents.
-        '''
-        mean_flat, err_flat = np.ravel(err.mean), np.ravel(err.err)
+        formatted_err = ''
+        formatted_mean = ''
+        formatted_exp = ''
         
-        formatted_means = np.empty_like(mean_flat, dtype=object)
-        formatted_errs = np.empty_like(mean_flat, dtype=object)
-        exponents = np.empty_like(mean_flat, dtype=int)
+        mean_exponent = self._calculate_exponent(mean, err)
+        mantissa_mean = mean / (10.0 ** mean_exponent)
+        mantissa_err = err / (10.0 ** mean_exponent)
+        
+        mantissa_precision = mean_exponent + self._calculate_precision(err, mean_exponent) 
+        if mantissa_precision > 0:
+            formatted_mean = f'{mantissa_mean:.{mantissa_precision}f}'
+            formatted_err = f'{mantissa_err:.{mantissa_precision}f}'
+        else:
+            formatted_mean = f'{int(mantissa_mean):d}'
+            formatted_err = f'{int(mantissa_err):d}'
+        if self.relative:
+            relative_error = 100 * mantissa_err / mantissa_mean
+            relative_precision = self._calculate_precision(relative_error, 0)
+            formatted_err = f'{relative_error:.{relative_precision}f}' if relative_precision > 0 else f'{int(relative_error):d}'
+        
+        if err == 0:
+            formatted_err = '0'
+        formatted_exp = mean_exponent if mean_exponent != 0 else None
 
-        for i, (val, error) in enumerate(zip(mean_flat, err_flat)):
-            mean_exponent = self._calculate_exponent(val, error)
+        return formatted_mean, formatted_err, formatted_exp
 
-            mantissa_mean = val / (10.0 ** mean_exponent)
-            mantissa_err = error / (10.0 ** mean_exponent)
-            
-            mantissa_precision = mean_exponent + self._calculate_precision(error, mean_exponent) 
-
-            if mantissa_precision > 0:
-                formatted_means[i] = f'{mantissa_mean:.{mantissa_precision}f}'
-                formatted_errs[i] = f'{mantissa_err:.{mantissa_precision}f}'
-            else:
-                formatted_means[i] = f'{int(mantissa_mean):d}'
-                formatted_errs[i] = f'{int(mantissa_err):d}'
-
-            if self.relative:
-                relative_error = 100 * mantissa_err / mantissa_mean
-                relative_precision = self._calculate_precision(relative_error, 0)
-                formatted_errs[i] = f'{relative_error:.{relative_precision}f}' if relative_precision > 0 else f'{int(relative_error):d}'
-            
-            if error == 0:
-                formatted_errs[i] = '0'
-
-            exponents[i] = mean_exponent
-
-        return (
-            formatted_means.reshape(err.mean.shape),
-            formatted_errs.reshape(err.err.shape),
-            exponents.reshape(err.mean.shape)
-        )
-
-    def latex_array(self, err: Err, delimiter: str = '$') -> np.ndarray:
+    def latex_array(self, err: Err, use_siunitx = False) -> np.ndarray:
         '''
         Format the means and errors in the Err object as LaTeX strings.
 
         Args:
             err (Err): The Err instance containing mean and error values.
             delimiter (str): Delimiter for LaTeX math mode, default is '$'.
+            use_siunitx (bool) : Wether to use the siunitx package
 
         Returns:
             np.ndarray: An array of formatted strings in LaTeX format.
         '''
         
-        def format_to_latex(m, e, exp):
-            percentage = r'\%' if self.relative else ''
-            if exp != 0:
-                return rf'{delimiter}({m} \pm {e}{percentage}) \times 10^{{{exp}}}{delimiter}'
-            else:
-                return rf'{delimiter}{m} \pm {e}{delimiter}{percentage}'
-        
-        
-        formatted_mean, formatted_err, exponents = self._format(err)
-        latex_strings = np.vectorize(format_to_latex)(formatted_mean, formatted_err, exponents)
-
-        return latex_strings
+        @np.vectorize
+        def format_to_latex(mean, err) -> str:
+            formatted_mean, formatted_err, formatted_exp = self._format(mean, err)
+            match use_siunitx, self.relative, formatted_exp is None:
+                case True, True, True:
+                    return rf'\SI{{{formatted_mean}}}{{\SI{{{formatted_err}}}{{\percent}}}}'
+                case True, True, False:
+                    return rf'\SI{{{formatted_mean}e{formatted_exp}}}{{\SI{{{formatted_err}}}{{\percent}}}}'
+                case True, False, True:
+                    return rf'\SI{{{formatted_mean}({formatted_err})}}{{}}'
+                case True, False, False:
+                    return rf'\SI{{{formatted_mean}({formatted_err})e{formatted_exp}}}{{}}'
+                case False, True, True:
+                    return rf'{formatted_mean} \pm {formatted_err}\%'
+                case False, True, False:
+                    return rf'({formatted_mean} \times 10^{{{formatted_exp}}}) \pm {formatted_err}\%'
+                case False, False, True:
+                    return rf'{formatted_mean} \pm {formatted_err}'
+                case False, False, False:
+                    return rf'({formatted_mean} \pm {formatted_err}) \times 10^{{{formatted_exp}}}'
+            
+        return format_to_latex(err.mean, err.err)
 
     def string_array(self, err: Err) -> np.ndarray:
         '''
@@ -169,17 +160,20 @@ class ErrFormat:
         Returns:
             np.ndarray: An array of formatted strings in plain text format.
         '''
-        def format_to_string(m, e, exp):
-            percentage = '%' if self.relative else ''
-            if exp != 0:
-                return f'({m} ± {e}{percentage}) × 10^{exp}'
-            else:
-                return f'{m} ± {e}{percentage}'
+        @np.vectorize
+        def format_to_string(mean, err) -> str:
+            formatted_mean, formatted_err, formatted_exp = self._format(mean, err)
+            match self.relative, formatted_exp is None:
+                case True, True:
+                    return f'{formatted_mean} ± {formatted_err}\%'
+                case True, False:
+                    return f'({formatted_mean} ± {formatted_err}\%) × 10^{formatted_exp}'
+                case False, True:
+                    return f'{formatted_mean} ± {formatted_err}'
+                case False, False:
+                    return f'({formatted_mean} ± {formatted_err}) × 10^{formatted_exp}'
         
-        formatted_mean, formatted_err, exponents = self._format(err)
-        strings = np.vectorize(format_to_string)(formatted_mean, formatted_err, exponents)
-
-        return strings
+        return format_to_string(err.mean, err.err)
 
     def __str__(self):
         return f'ErrFormat(err_sigfigs={self.err_sigfigs}, val_sigfigs={self.val_sigfigs}, relative={self.relative}, exponent_factor={self.exponent_factor}, min_positive_exponent={self.min_positive_exponent}, max_negative_exponent={self.max_negative_exponent})'

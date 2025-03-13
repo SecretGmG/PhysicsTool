@@ -3,7 +3,10 @@ import sympy
 from typing import Optional, TextIO, Union
 from IPython.display import display, Latex
 from sys import stdout
+from PhysicsTool.core.err import Err
 
+
+use_siunitx = True
 
 def _get_tex_df(df: pd.DataFrame, caption: str = 'Caption', label: str = 'tab:labelname') -> str:
     '''
@@ -23,7 +26,7 @@ def _get_tex_df(df: pd.DataFrame, caption: str = 'Caption', label: str = 'tab:la
     df = df.copy()
     from .err import Err
     df = df.map(
-        lambda e: e.latex() if type(e) is Err else e
+        lambda e: e.latex(use_siunitx=use_siunitx) if type(e) is Err else e
     )
     h = r'\begin{table}[H]' + '\n' + r'\centering' + '\n'
     t = f'\\caption{{{caption}}}\n\\label{{{label}}}\n' + r'\end{table}' + '\n'
@@ -43,6 +46,8 @@ def _get_latex_str(expr: Union[str, sympy.Basic, pd.DataFrame, Latex]) -> str:
     latex_str = None
     if isinstance(expr, sympy.Basic):
         latex_str = f'\\[\n{sympy.latex(expr)}\n\\]'
+    elif isinstance(expr, Err):
+        latex_str = expr.latex(use_siunitx=use_siunitx)
     elif isinstance(expr, pd.DataFrame):
         latex_str = _get_tex_df(expr)
     elif isinstance(expr, Latex):
@@ -54,7 +59,7 @@ def _get_latex_str(expr: Union[str, sympy.Basic, pd.DataFrame, Latex]) -> str:
             latex_str = expr._repr_latex_()
             if isinstance(latex_str, tuple):
                 latex_str, *_ = latex_str
-        except Exception:  # Catch for missing _repr_latex_
+        except AttributeError:
             latex_str = str(expr)
     return latex_str
 

@@ -138,17 +138,18 @@ class Err:
         err_weighted_avg = np.sqrt(1 / np.sum(weights, axis=axis))
         return Err(mean_weighted_avg, err_weighted_avg, format = self.format)
 
-    def latex(self, delimiter: str = '$') -> str:
+    def latex(self, use_siunitx : bool = True) -> str:
         '''
         Generates a LaTeX string for the error and mean values with customizable formatting.
 
         Parameters:
             delimiter (str): The delimiter used to enclose LaTeX expressions.
+            use_siunitx (bool) : Wether to use the siunitx package
 
         Returns:
             str: A LaTeX-formatted string.
         '''
-        return r'\\'.join(np.ravel(self.format.latex_array(self, delimiter)))
+        return '\\\\\n'.join(np.ravel(self.format.latex_array(self, use_siunitx)))
 
     def flatten(self):
         '''
@@ -175,7 +176,7 @@ class Err:
         '''
         Pretty LaTeX representation for Jupyter notebooks, using LaTeX formatting.
         '''
-        return '$' + self.latex('') + '$'
+        return '$' + self.latex(use_siunitx=False) + '$'
 
     def __getitem__(self, indices):
         return Err(self.mean[indices], self.err[indices], format=self.format)
