@@ -72,7 +72,7 @@ class ErrFormat:
             return 0
         relevant_value = val if val != 0 else error
         exponent = int(np.floor(np.log10(abs(relevant_value)) / self.exponent_factor) * self.exponent_factor)
-        if exponent > 0 and exponent < self.min_positive_exponent:
+        if exponent >   and exponent < self.min_positive_exponent:
             exponent = 0
         if exponent < 0 and exponent > self.max_negative_exponent:
             exponent = 0
