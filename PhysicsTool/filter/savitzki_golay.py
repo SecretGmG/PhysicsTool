@@ -30,7 +30,7 @@ def savitzki_golay_filter(
     radius = window // 2
 
     A = np.array([[j**i for i in range(deg + 1)] for j in range(-radius, radius + 1)])
-    B = np.linalg.inv(A.T @ A) @ A.T
+    B = np.linalg.pinv(A.T @ A) @ A.T
 
     match edge:
         case "pad":

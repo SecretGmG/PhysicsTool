@@ -12,8 +12,6 @@ import numpy as np
 class FunctionalModel(ABC):
     """
     Abstract base class for parametric models fitted with weighted least squares.
-
-    Stores all intermediate computations for transparency and debugging.
     """
 
     ### Constants
@@ -29,7 +27,7 @@ class FunctionalModel(ABC):
 
     # is called after each iteration, can be used to print or log the current state of the model
     # default is a no-op, but can be set to a function that takes the model as argument
-    logger: Callable = lambda *args: None
+    logger: Callable[["FunctionalModel"], None] = lambda *args: None
 
     # defines the initial parameters, can be set before calling fit() to define initial parameters
     # default value is determined by implementation
@@ -215,7 +213,9 @@ class FunctionalModel(ABC):
 
         if errorband:
             eval_stderr = self.eval_stderr(linspace, sigma)
-            plt.fill_between(linspace, y - eval_stderr, y + eval_stderr, **fill_kwargs)
+            plt.fill_between(
+                linspace, y - eval_stderr, y + eval_stderr, **fill_kwargs  # type: ignore
+            )
 
     def show_correlation(self, parameter_ticks: bool | None = None):
         """
@@ -240,7 +240,7 @@ class FunctionalModel(ABC):
             plt.xticks(range(n_ticks), ticks)
             plt.yticks(range(n_ticks), ticks)
 
-        plt.gca().xaxis.set_label_position("top")
+        plt.gca().xaxis.set_label_position("top")  # type: ignore
         plt.xlabel("parameter")
         plt.ylabel("parameter")
 

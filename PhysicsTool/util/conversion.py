@@ -53,14 +53,14 @@ def gon_to_degrees(gons: int, tenthgons: int, centigons: int) -> Tuple[int, int,
 def degrees_to_gon(
     degrees: int, arcminutes: int, arcseconds: float
 ) -> Tuple[int, int, int]:
-    """Convert from degrees, arcminutes, and arcseconds to gons, tenthgons, and centigons.
-
-     Args:
+    """
+    Convert from degrees, arcminutes, and arcseconds to gons, tenthgons, and centigons.
+    Args:
         degrees (int): Number of degrees.
         arcminutes (int, optional): Number of arcminutes (1/60 of a degree). Defaults to 0.
         arcseconds (float, optional): Number of arcseconds (1/3600 of a degree). Defaults to 0.
 
-    Returns:
+    Returns
         tuple: Gons, tenthgons, centigons.
     """
     # Total degrees as a decimal number

@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def matrix_quiver(
+def matrix_quiver_plot(
     x: np.ndarray,
     y: np.ndarray,
     matrices: np.ndarray,
@@ -11,18 +11,18 @@ def matrix_quiver(
     det_label="determinant",
 ):
     """
-    Visualizes eigenvectors of matrices using quiver plots.
+    Visualizes eigenvectors of 2×2 matrices on a 2D grid using quiver plots.
 
     Args:
-        x (np.ndarray): X-coordinates for the quiver plot.
-        y (np.ndarray): Y-coordinates for the quiver plot.
-        matrices (np.ndarray): Matrices for which eigenvectors are computed.
+        x (np.ndarray): X-coordinates of the grid. Shape: (M, N).
+        y (np.ndarray): Y-coordinates of the grid. Shape: (M, N).
+        matrices (np.ndarray): Array of 2×2 matrices at each grid point. Shape: (M, N, 2, 2).
         shade_determinant (bool): If True, shades the plot based on the determinant of the matrices.
-        label (str): Label for the eigenvectors. optional defaults to None
-        det_label (str): Label for the determinant. optional defaults to 'determinant'
-    Returns:
-        None
+        label (str, optional): Label for the eigenvectors (for legend). Defaults to None.
+        det_label (str, optional): Label for the determinant colorbar. Defaults to 'determinant'.
+        ax (matplotlib.axes.Axes, optional): Axes to plot on. Defaults to current axes.
     """
+
     # remove the arrowheads and set the pivot to mid to vizualize eigenvectors
     EIGEN_VEC_QUIVER_KWARGS = {
         "headwidth": 0,
@@ -64,4 +64,4 @@ def matrix_quiver(
 
     if label is not None:
         # add empty scatter plot to add label, is a little hacky but works
-        plt.scatter(None, None, marker="+", label=label, color="black")
+        plt.scatter([], [], marker="+", label=label, color="black")

@@ -1,6 +1,4 @@
-import correlated_error_prop
-import filtering
+import err
+import filter
 import plotting
-import uncorrelated_error_prop
 import util
-
