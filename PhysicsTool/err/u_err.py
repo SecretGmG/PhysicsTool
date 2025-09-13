@@ -2,8 +2,9 @@ import numpy as np
 import sympy
 from numpy.typing import ArrayLike
 from typing import Iterable, Optional, Dict
-from u_err_format import get_formatter, UErrFormatter
-from error_prop import derive_err
+from .u_err_format import get_formatter, UErrFormatter
+from .error_prop import u_propagate_error
+
 
 a, b = sympy.symbols("a,b")
 
@@ -147,6 +148,18 @@ class UErr:
             formatter = get_formatter()
         return "\\\\\n".join(np.ravel(formatter.latex_array(self.mean, self.err)))
 
+    def toString(self, formatter: UErrFormatter | None = None) -> str:
+        """
+
+        Generates a string representation of the error and mean values with customizable formatting.
+
+        Returns:
+            str: A formatted string.
+        """
+        if formatter is None:
+            formatter = get_formatter()
+        return "\n".join(np.ravel(formatter.string_array(self.mean, self.err)))
+
     def flatten(self):
         """
         Flattens the Err object into 1D. Returns an Err object where mean and err are 1D arrays.
@@ -161,7 +174,7 @@ class UErr:
         Returns:
             str: A formatted string.
         """
-        return "\n".join(np.ravel(get_formatter().string_array(self.mean, self.err)))
+        return self.toString()
 
     def __repr__(self):
         """
@@ -227,7 +240,7 @@ class UErr:
         nr_symbols = sympy.numbered_symbols()
         symbols = [next(nr_symbols) for _ in range(len(inputs) + len(kwargs))]
         try:
-            out = calc_err(sympy_ufunc(*symbols), dict(zip(symbols, inputs)))
+            out = u_propagate_error(sympy_ufunc(*symbols), dict(zip(symbols, inputs)))
         except Exception:
             raise ValueError(f"Error in applying {ufunc.__name__} to Err objects")
         return out
@@ -258,34 +271,34 @@ class UErr:
         return UErr(np.abs(self.mean), self.err)
 
     def __add__(self, other):
-        return calc_err(a + b, {a: self, b: other})
+        return u_propagate_error(a + b, {a: self, b: other})
 
     def __sub__(self, other):
-        return calc_err(a - b, {a: self, b: other})
+        return u_propagate_error(a - b, {a: self, b: other})
 
     def __mul__(self, other):
-        return calc_err(a * b, {a: self, b: other})
+        return u_propagate_error(a * b, {a: self, b: other})
 
     def __pow__(self, other):
-        return calc_err(a**b, {a: self, b: other})
+        return u_propagate_error(a**b, {a: self, b: other})
 
     def __truediv__(self, other):
-        return calc_err(a / b, {a: self, b: other})
+        return u_propagate_error(a / b, {a: self, b: other})
 
     def __radd__(self, other):
-        return calc_err(b + a, {a: self, b: other})
+        return u_propagate_error(b + a, {a: self, b: other})
 
     def __rsub__(self, other):
-        return calc_err(b - a, {a: self, b: other})
+        return u_propagate_error(b - a, {a: self, b: other})
 
     def __rmul__(self, other):
-        return calc_err(b * a, {a: self, b: other})
+        return u_propagate_error(b * a, {a: self, b: other})
 
     def __rpow__(self, other):
-        return calc_err(b**a, {a: self, b: other})
+        return u_propagate_error(b**a, {a: self, b: other})
 
     def __rtruediv__(self, other):
-        return calc_err(b / a, {a: self, b: other})
+        return u_propagate_error(b / a, {a: self, b: other})
 
 
 def concatenate(errs: Iterable["UErr"], axis=0) -> "UErr":
@@ -319,53 +332,3 @@ def from_data(data: ArrayLike, axis: Optional[int] = None) -> UErr:
         np.count_nonzero(~np.isnan(data), axis)
     )
     return UErr(mean, std_err)
-
-
-def calc_err(
-    expr: sympy.Expr,
-    values: Dict[sympy.Symbol, UErr | ArrayLike],
-) -> UErr:
-    """
-    Calculates the error of the given expression applied to the given values.
-
-    Parameters:
-        expr (Expr): The sympy expression for which to calculate the error.
-        values (Dict[Symbol, Union[Err, ArrayLike]]): A dictionary mapping symbols to Err instances or array-like values.
-
-    Returns:
-        Err: The computed error as an Err instance.
-    """
-
-    err_prefix = "temporary_error_prefix"
-
-    _check_for_missing_symbols(expr, values)
-
-    # cast all values to errors
-    uerr_values: dict[sympy.Symbol, UErr] = {
-        key: UErr(val) for key, val in values.items()
-    }
-
-    mean_values: dict[sympy.Symbol, np.ndarray] = {
-        key: val.mean for key, val in uerr_values.items()
-    }
-    err_values = {
-        sympy.Symbol(f"{err_prefix}_{key}"): val.err for key, val in uerr_values.items()
-    }
-
-    all_values = mean_values | err_values
-
-    err_expr = derive_err(expr, list(mean_values.keys()), err_prefix=err_prefix)
-
-    mean_func = sympy.lambdify(all_values.keys(), expr)
-    err_func = sympy.lambdify(all_values.keys(), err_expr)
-
-    return UErr(mean_func(*all_values.values()), err_func(*all_values.values()))
-
-
-def _check_for_missing_symbols(expr, values):
-    missing_symbols = [symbol for symbol in expr.free_symbols if symbol not in values]
-    if missing_symbols:
-        missing_symbols_string = ", ".join([str(s) for s in missing_symbols])
-        raise ValueError(
-            f"Missing value for required symbols: {missing_symbols_string}"
-        )

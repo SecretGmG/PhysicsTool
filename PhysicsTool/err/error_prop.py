@@ -1,6 +1,10 @@
+from __future__ import annotations
 import sympy
 import numpy as np
-from typing import Iterable, Optional, Callable
+from typing import Iterable, Optional, Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .u_err import UErr
 
 
 def error_propagation_formula(
@@ -55,7 +59,7 @@ def propagate_error(
     return (result, result_cov)
 
 
-def derive_err(
+def u_error_propagation_formula(
     expr: sympy.Expr,
     values: Optional[list[sympy.Symbol]] = None,
     target_symbol: sympy.Symbol = sympy.Symbol("f"),
@@ -145,3 +149,56 @@ def derive_err(
     logger(sympy.Eq(target_err_symbol, err_expr, evaluate=False))
 
     return err_expr
+
+
+def u_propagate_error(
+    expr: sympy.Expr,
+    values: dict[sympy.Symbol, UErr | np.ndarray],
+) -> UErr:
+    """
+    Calculates the error of the given expression applied to the given values.
+
+    Parameters:
+        expr (Expr): The sympy expression for which to calculate the error.
+        values (Dict[Symbol, Union[Err, ndarray]]): A dictionary mapping symbols to Err instances or ndarrays values.
+
+    Returns:
+        Err: The computed error as an Err instance.
+    """
+
+    from .u_err import UErr
+
+    err_prefix = "temporary_error_prefix"
+
+    _check_for_missing_symbols(expr, values)
+
+    # cast all values to errors
+    uerr_values: dict[sympy.Symbol, UErr] = {
+        key: UErr(val) for key, val in values.items()
+    }
+
+    mean_values: dict[sympy.Symbol, np.ndarray] = {
+        key: val.mean for key, val in uerr_values.items()
+    }
+    err_values = {
+        sympy.Symbol(f"{err_prefix}_{key}"): val.err for key, val in uerr_values.items()
+    }
+
+    all_values = mean_values | err_values
+
+    err_expr = u_error_propagation_formula(
+        expr, list(mean_values.keys()), err_prefix=err_prefix
+    )
+
+    mean_func = sympy.lambdify(all_values.keys(), expr)
+    err_func = sympy.lambdify(all_values.keys(), err_expr)
+    return UErr(mean_func(*all_values.values()), err_func(*all_values.values()))
+
+
+def _check_for_missing_symbols(expr, values):
+    missing_symbols = [symbol for symbol in expr.free_symbols if symbol not in values]
+    if missing_symbols:
+        missing_symbols_string = ", ".join([str(s) for s in missing_symbols])
+        raise ValueError(
+            f"Missing value for required symbols: {missing_symbols_string}"
+        )
