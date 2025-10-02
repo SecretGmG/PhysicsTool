@@ -1,17 +1,33 @@
-import matplotlib.pyplot as plt
-from numpy import ndarray
 from typing import Optional
 
+import matplotlib
+import matplotlib.pyplot as plt
+from numpy import ndarray
 
-def start_plot(
+
+def set_theme():
+    """Set a consistent theme for scientific matplotlib plots."""
+    matplotlib.rcParams.update({
+        "figure.figsize": (12, 6),
+        "font.size": 13,
+        "axes.titlesize": 15,
+        "legend.fontsize": 13,
+        "axes.grid": True,
+        "grid.alpha": 0.5,
+        "lines.linewidth": 1.8,
+        "lines.markersize": 6,
+        "figure.dpi": 200,
+        "figure.autolayout": True,
+        "savefig.dpi": 300,
+        "savefig.bbox": "tight",
+    })
+
+
+def set_up_plot(
     title: str = "",
     xlabel: str = "x",
     ylabel: str = "y",
-    grid: bool = True,
     ax=None,
-    fontsize: int = 13,
-    labelsize: int = 12,
-    ticksize: int = 11,
 ) -> None:
     """
     Set up the title, xlabel, ylabel, and grid for the matplotlib plot.
@@ -20,11 +36,7 @@ def start_plot(
         title (str): The title of the plot.
         xlabel (str): The label for the x-axis.
         ylabel (str): The label for the y-axis.
-        grid (bool, optional): Whether to display grid lines on the plot. Defaults to True.
         ax (matplotlib.axes.Axes, optional): The axis to apply the settings to. Defaults to the current axis.
-        fontsize (int, optional): Font size for the title. Defaults to 14.
-        labelsize (int, optional): Font size for the axis labels. Defaults to 12.
-        ticksize (int, optional): Font size for the tick labels. Defaults to 11.
 
     Returns:
         None
@@ -32,36 +44,9 @@ def start_plot(
     if ax is None:
         ax = plt.gca()
     if title:
-        ax.set_title(title, fontsize=fontsize)  # type: ignore
-    ax.set_xlabel(xlabel, fontsize=labelsize)  # type: ignore
-    ax.set_ylabel(ylabel, fontsize=labelsize)  # type: ignore
-
-    # Set the x and y axis tick label font sizes
-    ax.tick_params(axis="x", labelsize=ticksize)  # type: ignore
-    ax.tick_params(axis="y", labelsize=ticksize)  # type: ignore
-
-    ax.grid(grid)  # type: ignore
-
-
-def end_plot(legend_loc: str = "best", legend_fontsize: int = 12, ax=None) -> None:
-    """
-    Finalize the matplotlib plot settings, display the legend
-
-    Parameters:
-        legend_loc (str, optional): The location of the legend on the plot. Defaults to 'best'.
-        legend_fontsize (int, optional): Font size for the legend text. Defaults to 12.
-        ax (matplotlib.axes.Axes, optional): The axis to apply the settings to. Defaults to the current axis.
-
-    Returns:
-        None
-    """
-    if ax is None:
-        ax = plt.gca()
-
-    handles, labels = ax.get_legend_handles_labels()  # type: ignore
-    if labels:
-        ax.legend(loc=legend_loc, fontsize=legend_fontsize)  # type: ignore
-
+        ax.set_title(title)  # type: ignore
+    ax.set_xlabel(xlabel)  # type: ignore
+    ax.set_ylabel(ylabel)  # type: ignore
 
 def err_band_plot(
     x: ndarray,
@@ -69,7 +54,7 @@ def err_band_plot(
     y_err: ndarray,
     label: Optional[str] = None,
     color: Optional[str] = None,
-    ax: Optional[plt.Axes] = None,
+    ax=None,
 ) -> None:
     """
     Plots the function defined by x, y, and additionally the shaded error band according to y_err.
