@@ -8,16 +8,12 @@ from numpy import ndarray
 def set_theme():
     """Set a consistent theme for scientific matplotlib plots."""
     matplotlib.rcParams.update({
-        "font.size": 13,
-        "axes.titlesize": 15,
-        "legend.fontsize": 13,
+        "figure.figsize": (7.0, 4.3),
+        "savefig.dpi": 300,
+        "figure.dpi": 200,
         "axes.grid": True,
         "grid.alpha": 0.5,
-        "lines.linewidth": 1.8,
-        "lines.markersize": 6,
-        "figure.dpi": 200,
         "figure.autolayout": True,
-        "savefig.dpi": 300,
         "savefig.bbox": "tight",
     })
 
