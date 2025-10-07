@@ -6,7 +6,6 @@ from .u_err_format import get_formatter, UErrFormatter
 from .error_prop import u_propagate_error
 
 
-a, b = sympy.symbols("a,b")
 
 
 class UErr:
@@ -24,6 +23,8 @@ class UErr:
 
     # Ensures Err takes precedence over NumPy arrays, leading to the correct ufunc behavior
     __array_priority__ = 1000
+
+
 
     def __init__(
         self, mean: ArrayLike | "UErr", err: Optional[ArrayLike] = None, relative=False
@@ -212,93 +213,76 @@ class UErr:
             yield self[i]  # Return an Err object for each "row" or slice
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
-        """
-        Implements the array ufunc protocol for Err objects, allowing for element-wise operations.
+        if method != "__call__":
+            return NotImplemented
+        _a, _b = sympy.symbols('a b')
+        binary_expr = {
+            np.add: _a + _b,
+            np.subtract: _a - _b,
+            np.multiply: _a * _b,
+            np.divide: _a / _b,
+                np.power: _a**_b,
+            }
+        if ufunc in binary_expr and len(inputs) == 2:
+            # create symbols for all inputs
+            return u_propagate_error(binary_expr[ufunc], {_a: inputs[0], _b: inputs[1]})
 
-        Parameters:
-            ufunc (numpy.ufunc): The numpy universal function to apply.
-            method (str): The method to apply, typically '__call__'.
-            inputs (Tuple): The input values to apply the ufunc to.
-            kwargs (Dict): Additional keyword arguments.
+        # --- Unary arithmetic ---
+        unary_ufuncs = {np.negative, np.positive, np.abs}
+        if ufunc in unary_ufuncs and len(inputs) == 1:
+            return UErr(ufunc(self.mean), self.err)
 
-        Returns:
-            Err: The resulting Err object after applying the ufunc.
-        """
-
-        assert method == "__call__", "Only __call__ method is supported"
-
+        # --- Other ufuncs mapped to SymPy functions ---
         sympy_func_name = ufunc.__name__.replace("arc", "a")
+        sympy_func = getattr(sympy, sympy_func_name, None)
+        if sympy_func is not None and isinstance(sympy_func, sympy.FunctionClass):
+            nr_symbols = sympy.numbered_symbols()
+            symbols = [next(nr_symbols) for _ in inputs]
+            sympy_expr = sympy_func(*symbols)
+            return u_propagate_error(sympy_expr, dict(zip(symbols, inputs)))
 
-        assert hasattr(
-            sympy, sympy_func_name
-        ), f"No equivalent sympy function for {ufunc.__name__}"
-        sympy_ufunc = getattr(sympy, sympy_func_name)
-        assert isinstance(
-            sympy_ufunc, sympy.FunctionClass
-        ), f"No equivalent sympy function for {ufunc.__name__}"
+        return NotImplemented
 
-        nr_symbols = sympy.numbered_symbols()
-        symbols = [next(nr_symbols) for _ in range(len(inputs) + len(kwargs))]
-        try:
-            out = u_propagate_error(sympy_ufunc(*symbols), dict(zip(symbols, inputs)))
-        except Exception:
-            raise ValueError(f"Error in applying {ufunc.__name__} to Err objects")
-        return out
+    # ---- Unary arithmetic ----
+    def __neg__(self): return np.negative(self)
+    def __abs__(self): return np.abs(self)
 
+    # ---- Binary arithmetic ----
+    def __add__(self, other): return np.add(self, other)
+    def __radd__(self, other): return np.add(other, self)
+    def __sub__(self, other): return np.subtract(self, other)
+    def __rsub__(self, other): return np.subtract(other, self)
+    def __mul__(self, other): return np.multiply(self, other)
+    def __rmul__(self, other): return np.multiply(other, self)
+    def __truediv__(self, other): return np.divide(self, other)
+    def __rtruediv__(self, other): return np.divide(other, self)
+    def __pow__(self, other): return np.power(self, other)
+    def __rpow__(self, other): return np.power(other, self)
+
+    # ---- Comparisons (mean only) ----
     def __eq__(self, other):
         if isinstance(other, UErr):
-            return np.array_equal(self.mean, other.mean) and np.array_equal(
-                self.err, other.err
-            )
-        return False  # Err objects are not equal to non-Err types
+            return (self.mean == other.mean) & (self.err == other.err)
+        return False
 
-    def __gt__(self, other):
-        return self.mean > other.mean
+    def __ne__(self, other):
+        if isinstance(other, UErr):
+            return not (self == other)
+        return True
 
     def __lt__(self, other):
-        return self.mean < other.mean
-
-    def __ge__(self, other):
-        return self.mean >= other.mean
+        return self.mean < (other.mean if isinstance(other, UErr) else other)
 
     def __le__(self, other):
-        return self.mean <= other.mean
+        return self.mean <= (other.mean if isinstance(other, UErr) else other)
 
-    def __neg__(self):
-        return UErr(-self.mean, self.err)
+    def __gt__(self, other):
+        return self.mean > (other.mean if isinstance(other, UErr) else other)
 
-    def __abs__(self):
-        return UErr(np.abs(self.mean), self.err)
+    def __ge__(self, other):
+        return self.mean >= (other.mean if isinstance(other, UErr) else other)
 
-    def __add__(self, other):
-        return u_propagate_error(a + b, {a: self, b: other})
 
-    def __sub__(self, other):
-        return u_propagate_error(a - b, {a: self, b: other})
-
-    def __mul__(self, other):
-        return u_propagate_error(a * b, {a: self, b: other})
-
-    def __pow__(self, other):
-        return u_propagate_error(a**b, {a: self, b: other})
-
-    def __truediv__(self, other):
-        return u_propagate_error(a / b, {a: self, b: other})
-
-    def __radd__(self, other):
-        return u_propagate_error(b + a, {a: self, b: other})
-
-    def __rsub__(self, other):
-        return u_propagate_error(b - a, {a: self, b: other})
-
-    def __rmul__(self, other):
-        return u_propagate_error(b * a, {a: self, b: other})
-
-    def __rpow__(self, other):
-        return u_propagate_error(b**a, {a: self, b: other})
-
-    def __rtruediv__(self, other):
-        return u_propagate_error(b / a, {a: self, b: other})
 
 
 def concatenate(errs: Iterable["UErr"], axis=0) -> "UErr":
