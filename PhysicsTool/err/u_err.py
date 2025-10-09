@@ -1,3 +1,4 @@
+from warnings import warn
 import numpy as np
 import sympy
 from numpy.typing import ArrayLike
@@ -161,7 +162,7 @@ class UErr:
             formatter = get_formatter()
         return "\n".join(np.ravel(formatter.string_array(self.mean, self.err)))
 
-    def flatten(self):
+    def flatten(self) -> 'UErr':
         """
         Flattens the Err object into 1D. Returns an Err object where mean and err are 1D arrays.
         This is useful for handling multi-dimensional cases.
@@ -233,15 +234,15 @@ class UErr:
             return UErr(ufunc(self.mean), self.err)
 
         # --- Other ufuncs mapped to SymPy functions ---
-        sympy_func_name = ufunc.__name__.replace("arc", "a")
-        sympy_func = getattr(sympy, sympy_func_name, None)
-        if sympy_func is not None and isinstance(sympy_func, sympy.FunctionClass):
-            nr_symbols = sympy.numbered_symbols()
-            symbols = [next(nr_symbols) for _ in inputs]
-            sympy_expr = sympy_func(*symbols)
-            return u_propagate_error(sympy_expr, dict(zip(symbols, inputs)))
-
-        return NotImplemented
+        np_func_name = ufunc.__name__.replace("arc", "a")
+        sympy_func = getattr(sympy, np_func_name, None)
+        if sympy_func is None:
+            warn(f'the function {np_func_name} is not implemented ins sympy and can there fore not be executed as a ufunc')
+            return NotImplemented
+        nr_symbols = sympy.numbered_symbols()
+        symbols = [next(nr_symbols) for _ in inputs]
+        sympy_expr = sympy_func(*symbols)
+        return u_propagate_error(sympy_expr, dict(zip(symbols, inputs)))
 
     # ---- Unary arithmetic ----
     def __neg__(self): return np.negative(self)
@@ -267,7 +268,7 @@ class UErr:
 
     def __ne__(self, other):
         if isinstance(other, UErr):
-            return not (self == other)
+            return ~ (self == other)
         return True
 
     def __lt__(self, other):
@@ -282,6 +283,9 @@ class UErr:
     def __ge__(self, other):
         return self.mean >= (other.mean if isinstance(other, UErr) else other)
 
+    @classmethod
+    def concatenate(cls, errs: Iterable['Uerr']) -> 'UErr': # type: ignore
+        return concatenate(errs)
 
 
 
