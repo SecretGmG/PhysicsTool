@@ -127,7 +127,7 @@ class FunctionalModel(ABC):
         Returns the cofactor matrix of the parameters.
         NOTE: needs to be multiplied by m_0**2 or sigma_0**2 to get the covariance matrix
         """
-        return np.linalg.inv(self.normal_matrix)
+        return np.linalg.pinv(self.normal_matrix)
 
     def parameter_corr(self) -> np.ndarray:
         """
